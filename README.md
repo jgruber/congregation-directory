@@ -1,0 +1,151 @@
+# Congregation Directory SPA
+
+A standalone, browser-based person directory search application built as a single HTML file. It imports a `Persons.csv` export, builds a local SQLite database in your browser, and provides a fast, tag-driven search interface — with no server, no installation, and no build step required.
+
+---
+
+## Getting Started
+
+1. Open `directory.html` in any modern browser (Chrome, Firefox, Edge, Safari).
+2. Click **Open Settings & Import** (or the ⚙️ icon in the top-right corner).
+3. Under **Data Import**, upload your `Persons.csv` file or configure a URL to fetch it from.
+4. The directory loads and is ready to search.
+
+> **Note:** Because sql.js and Tailwind are loaded from CDN, the browser needs an internet connection on first load. After the initial load, all data is stored locally.
+
+---
+
+## Features
+
+### Search & Filter
+
+- **Name search** — filter by first name, last name, or display name.
+- **Tag filter panel** — all tags generated from the CSV are grouped by category and displayed as clickable chips.
+- **Tag filter modes:**
+  - Click a tag once → **Include** (highlighted in theme colour)
+  - Click again → **Exclude / NOT** (highlighted in red)
+  - Click a third time → removes the filter
+- **AND / OR mode** — toggle between:
+  - **AND** — person must match *all* included tags
+  - **OR** — person must match *at least one* included tag
+  - Excluded (NOT) tags are always applied regardless of AND/OR mode
+- Active filters are shown as chips below the search bar and can be removed individually or all at once.
+
+### Tag Categories
+
+| Category | Description |
+|---|---|
+| Congregation Status | Publisher, Baptized, Unbaptized Publisher, Associated Family, Active, Inactive, Field Service Group |
+| Appointment | Elder, Ministerial Servant, Regular Pioneer, Continuous Auxiliary Pioneer, Special Pioneer |
+| Family | Male, Female, Family Head, Family name |
+| Field Service Group | Field Service Group Overseer, Field Service Group Assistant |
+| OCLM / Student | OCLM Enrolled, Bible Reading, Initial Call, Follow Up, Making Disciples, Explaining Beliefs, Talks, Assistant |
+| Meeting Assignments | Midweek Chairman, Midweek Classroom Counselor, Prayer |
+| Treasures from God's Word | Treasure from God's Word, Digging for Spiritual Gems |
+| Living as Christians | Living as Christians Parts |
+| Congregation Bible Study | CBS Conductor, CBS Reader |
+| Public Meeting | Local Public Talks, Away Public Talks, Weekend Chairman, Watchtower Reader |
+| Field Service | Local Public Witnessing, Local Public Witnessing Key Person, Meeting for Field Service Conductor/Prayer, Local Maintenance Volunteer |
+| Hall Duties | Auditorium Attendant, Entrance Attendant, Video Conference Host, Microphone Carrier, Audio/Video Operator, Stage Attendant |
+
+### Person Cards & Detail View
+
+Each person is displayed as a card showing:
+- Initials avatar (colour-coded by name)
+- Full name, field service group, and family name
+- Key appointment badges (Elder, MS, Pioneer, etc.)
+- Status badges (Inactive, Moved, Child, Removed)
+- Mobile phone number (tap to call on mobile devices)
+
+Tap or click any card to open a **detail modal** showing full contact information, all tags organised by category, and biographical details.
+
+### Data Import
+
+**Manual CSV Upload**
+- Click or drag-and-drop a `Persons.csv` file onto the upload area in Settings.
+- The file must match the column structure exported by the congregation management software (see [CSV Format](#csv-format) below).
+
+**Auto-Fetch from URL**
+- Enter a URL pointing to a hosted `Persons.csv` file.
+- Enter a username and password if the URL requires HTTP Basic authentication.
+- Click **Fetch Now** to import immediately.
+- Set an **Auto-sync interval** (hourly, 6-hourly, daily, or weekly) to have the app check for updates automatically on startup.
+
+### Database
+
+- The SQLite database is stored entirely in your browser's **IndexedDB** — it persists across page reloads without any server.
+- The schema is identical to the one produced by `syncPersons.py`, with tables: `congregations`, `field_service_groups`, `families`, `persons`, and `tags`.
+- **Export .db File** — download the database as a standard `.db` file compatible with any SQLite tool.
+- **Clear Database** — permanently remove all data from the browser.
+
+### Appearance
+
+Accessed via the ⚙️ Settings menu:
+
+- **Dark / Light mode** — toggle between themes; defaults to your system preference on first load.
+- **Theme colour** — choose from Blue, Indigo, Green, Purple, Orange, or Rose. The selection is saved between sessions.
+
+---
+
+## CSV Format
+
+The application expects a CSV file with the standard column headers produced by the congregation management software. Required columns include:
+
+| Column | Description |
+|---|---|
+| `PersonID` | Unique integer identifier |
+| `FirstName`, `LastName`, `DisplayName` | Name fields |
+| `Gender` | `Male` or `Female` |
+| `DOB` | Date of birth (`YYYY/MM/DD`) |
+| `DateOfBaptism` | Baptism date (`YYYY/MM/DD`) |
+| `PhoneMobile`, `PhoneHome`, `PhoneWork` | Phone numbers |
+| `Email`, `Email2` | Email addresses |
+| `Address` | Full street address (multiline supported) |
+| `FamilyID`, `FamilyName`, `FamilyHead` | Family grouping |
+| `FieldServiceGroupID`, `GroupName`, `GroupResponsibility` | FSG assignment (`Overseer`, `Assistant`, or blank) |
+| `Privilege` | `E` (Elder), `MS` (Ministerial Servant), `PUB` (Publisher), `UBP` (Unbaptized Publisher), `No` (Associated) |
+| `PioneerStatus` | `RegularPioneer`, `AuxiliaryPioneer`, `SpecialPioneer`, or blank |
+| `Active` | `True` or `False` |
+| `CLMStudent` | `True` or `False` |
+| `Moved`, `Removed` | `True` or `False` |
+| `ElderlyInfirm`, `Blind`, `Deaf`, `Child`, `Incarcerated` | Special circumstances (`True`/`False`) |
+| `UseFor*` | Assignment eligibility flags (`True`/`False`) — see full list in the CSV header |
+
+---
+
+## Technical Details
+
+| Component | Technology |
+|---|---|
+| UI framework | [Tailwind CSS](https://tailwindcss.com) (Play CDN) |
+| Database engine | [sql.js](https://sql.js.org) 1.10.2 (SQLite compiled to WebAssembly) |
+| Persistence | Browser IndexedDB |
+| Dependencies | None — single HTML file, CDN only |
+
+### Browser Compatibility
+
+Requires a modern browser with support for:
+- WebAssembly
+- IndexedDB
+- ES2020+ (async/await, optional chaining, etc.)
+
+Tested on current versions of Chrome, Firefox, Edge, and Safari.
+
+### Privacy & Security
+
+- All data is processed and stored **locally in your browser**. Nothing is sent to any external service.
+- HTTP Basic authentication credentials entered for URL auto-fetch are saved in browser `localStorage`. Do not use this feature on a shared or public computer.
+- If the target URL is on a different origin, the server must send appropriate **CORS headers** (`Access-Control-Allow-Origin`) for the browser to allow the fetch. This is a browser security restriction that cannot be bypassed.
+
+---
+
+## Relationship to `syncPersons.py`
+
+`directory.html` is the browser-side counterpart to the Python `syncPersons.py` script. It reproduces the same data processing logic entirely in JavaScript:
+
+- Parses the `Persons.csv` format (including quoted multiline fields)
+- Builds the same SQLite table schema (`persons`, `families`, `field_service_groups`, `congregations`, `tags`)
+- Generates the same tag records (type/name/value) for every person
+- Applies the same address parsing heuristic to split raw address strings into street, city, state, and postal code components
+
+The legacy database portions of `syncPersons.py` are not replicated, as the SPA operates independently of any server-side database.

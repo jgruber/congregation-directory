@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Congregation Directory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"
+          crossorigin="anonymous"></script>
+  <style>
+    /* Theme CSS variables */
+    :root                { --p:#3b82f6; --ph:#2563eb; --pl:#eff6ff; --pr:#93c5fd; }
+    html[data-theme=indigo] { --p:#6366f1; --ph:#4338ca; --pl:#eef2ff; --pr:#a5b4fc; }
+    html[data-theme=green]  { --p:#22c55e; --ph:#15803d; --pl:#f0fdf4; --pr:#86efac; }
+    html[data-theme=purple] { --p:#a855f7; --ph:#7e22ce; --pl:#faf5ff; --pr:#d8b4fe; }
+    html[data-theme=orange] { --p:#f97316; --ph:#c2410c; --pl:#fff7ed; --pr:#fdba74; }
+    html[data-theme=rose]   { --p:#f43f5e; --ph:#be123c; --pl:#fff1f2; --pr:#fda4af; }
+
+    .btn-primary { background-color: var(--p); }
+    .btn-primary:hover { background-color: var(--ph); }
+    .text-primary { color: var(--p); }
+    .border-primary { border-color: var(--p); }
+    .ring-primary:focus { --tw-ring-color: var(--pr); }
+    .bg-primary-light { background-color: var(--pl); }
+    .chip-include { background-color: var(--pl); color: var(--ph); }
+    .dark .chip-include { background-color: color-mix(in srgb, var(--p) 25%, transparent); color: var(--pr); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(128,128,128,.3); border-radius: 4px; }
+
+    /* Transitions */
+    .slide-up { transform: translateY(100%); transition: transform .3s ease; }
+    .slide-up.open { transform: translateY(0); }
+
+    /* Card hover */
+    .person-card { transition: box-shadow .15s, transform .15s; }
+    .person-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.12); transform: translateY(-1px); }
+    .dark .person-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {} }
+    };
+  </script>
+</head>
+
+<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased">
+<div id="app" class="flex flex-col h-full">
+
+  <!-- ═══════════════════════ HEADER ═══════════════════════ -->
+  <header class="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+    <!-- Title bar -->
+    <div class="flex items-center px-4 h-13 gap-3 py-2">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <svg class="w-6 h-6 flex-shrink-0" style="color:var(--p)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <h1 class="text-base font-semibold truncate">Congregation Directory</h1>
+      </div>
+      <button id="settingsBtn"
+        class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+        title="Settings">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search + filter toggle row -->
+    <div class="px-3 pb-2 flex gap-2">
+      <div class="relative flex-1">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input id="searchInput" type="search" placeholder="Search by name…"
+          class="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 border-0
+                 focus:outline-none focus:ring-2 focus:ring-[var(--pr)] transition-all" />
+      </div>
+      <button id="filterToggleBtn"
+        class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
+               bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+        </svg>
+        <span>Filter</span>
+        <span id="filterBadge"
+          class="hidden text-xs font-bold text-white rounded-full w-4 h-4 flex items-center justify-center"
+          style="background:var(--p)">0</span>
+      </button>
+    </div>
+
+    <!-- Active filters bar -->
+    <div id="activeFiltersBar" class="hidden px-3 pb-2">
+      <div class="flex items-center flex-wrap gap-1.5">
+        <button id="andOrToggle"
+          class="px-2 py-0.5 rounded text-xs font-bold border transition-colors"
+          style="color:var(--p);border-color:var(--p)">AND</button>
+        <div id="filterChips" class="flex flex-wrap gap-1"></div>
+        <button id="clearFiltersBtn" class="text-xs text-red-500 hover:text-red-700 ml-1">Clear all</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ MAIN LAYOUT ═══════════════════════ -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- Sidebar (desktop) -->
+    <aside id="filterSidebar"
+      class="hidden md:flex flex-col w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800
+             bg-white dark:bg-gray-900 overflow-y-auto">
+      <div class="p-4 flex-1">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Filter by Tags</p>
+        <div id="tagPanelDesktop" class="space-y-3"></div>
+      </div>
+    </aside>
+
+    <!-- Results pane -->
+    <main class="flex-1 overflow-y-auto">
+      <!-- Empty state -->
+      <div id="emptyState" class="flex flex-col items-center justify-center h-full text-center p-6 text-gray-400">
+        <svg class="w-20 h-20 mb-5 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <p class="text-lg font-semibold text-gray-500 dark:text-gray-400">No directory loaded</p>
+        <p class="text-sm mt-1 text-gray-400">Import a Persons CSV file to get started</p>
+        <button id="emptyImportBtn"
+          class="mt-5 px-5 py-2.5 rounded-lg text-sm font-medium text-white btn-primary transition-colors shadow-sm">
+          Open Settings &amp; Import
+        </button>
+      </div>
+
+      <!-- Results header -->
+      <div id="resultsHeader" class="hidden sticky top-0 z-10 px-4 py-2 bg-gray-50/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+        <p id="resultsCount" class="text-xs text-gray-500 dark:text-gray-400"></p>
+      </div>
+
+      <!-- Cards grid -->
+      <div id="resultsGrid"
+        class="hidden p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      </div>
+
+      <!-- No results -->
+      <div id="noResults" class="hidden flex flex-col items-center justify-center py-16 text-gray-400">
+        <svg class="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="font-medium text-gray-500">No persons match your filters</p>
+        <button id="clearFiltersBtn2" class="mt-2 text-sm text-primary hover:underline">Clear filters</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MOBILE FILTER SHEET ═══════════════════════ -->
+<div id="filterSheet" class="hidden fixed inset-0 z-30 md:hidden">
+  <div id="filterSheetBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div id="filterSheetPanel"
+    class="absolute bottom-0 inset-x-0 bg-white dark:bg-gray-900 rounded-t-2xl
+           max-h-[75vh] flex flex-col slide-up">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="font-semibold">Filter by Tags</h2>
+      <button id="closeFilterSheet" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="overflow-y-auto p-4">
+      <div id="tagPanelMobile" class="space-y-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PERSON DETAIL MODAL ═══════════════════════ -->
+<div id="personModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div id="personModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-lg sm:rounded-2xl
+              max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <div id="personModalAvatar"
+          class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"></div>
+        <div>
+          <h2 id="personModalName" class="font-semibold text-base"></h2>
+          <p id="personModalSub" class="text-xs text-gray-500 dark:text-gray-400"></p>
+        </div>
+      </div>
+      <button id="closePersonModal" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="personModalContent" class="overflow-y-auto px-5 py-4 space-y-4"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SETTINGS MODAL ═══════════════════════ -->
+<div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+  <div id="settingsModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-xl sm:rounded-2xl
+              max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-lg font-semibold">Settings</h2>
+      <button id="closeSettingsBtn" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto px-5 py-5 space-y-7">
+
+      <!-- ── Data Import ── -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Data Import</h3>
+
+        <!-- Manual CSV upload -->
+        <div class="mb-5">
+          <label class="block text-sm font-medium mb-2">Manual CSV Upload</label>
+          <label id="csvDropZone"
+            class="flex flex-col items-center justify-center gap-2 w-full py-6 border-2 border-dashed
+                   border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer
+                   hover:border-[var(--p)] hover:bg-primary-light dark:hover:bg-gray-800 transition-all">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <span id="csvDropLabel" class="text-sm text-gray-500">Drop Persons.csv here or <span class="text-primary font-medium">browse</span></span>
+            <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+          </label>
+          <div class="flex items-center gap-2 mt-2">
+            <button id="importCsvBtn"
+              class="px-4 py-2 rounded-lg text-sm font-medium text-white btn-primary transition-colors disabled:opacity-40"
+              disabled>Import CSV</button>
+            <span id="importStatus" class="text-xs text-gray-500 dark:text-gray-400 flex-1"></span>
+          </div>
+        </div>
+
+        <!-- URL fetch -->
+        <div class="space-y-3">
+          <label class="block text-sm font-medium">Auto-Fetch from URL <span class="text-xs text-gray-400 font-normal">(with BASIC auth)</span></label>
+          <input type="url" id="csvUrlInput" placeholder="https://your-server.example/data/Persons.csv"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
+                   bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]" />
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="csvUsernameInput" placeholder="Username"
+              class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
+                     bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]" />
+            <input type="password" id="csvPasswordInput" placeholder="Password"
+              class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
+                     bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]" />
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="fetchNowBtn"
+              class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition-colors">
+              Fetch Now
+            </button>
+            <div class="flex items-center gap-2">
+              <label class="text-sm">Auto-sync:</label>
+              <select id="autoSyncInterval"
+                class="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
+                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]">
+                <option value="0">Disabled</option>
+                <option value="3600000">Every hour</option>
+                <option value="21600000">Every 6 hours</option>
+                <option value="86400000">Daily</option>
+                <option value="604800000">Weekly</option>
+              </select>
+            </div>
+          </div>
+          <div id="fetchStatus" class="text-xs text-gray-500 dark:text-gray-400"></div>
+          <div id="lastSyncInfo" class="text-xs text-gray-400"></div>
+        </div>
+      </section>
+
+      <!-- ── Database ── -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Database</h3>
+        <div id="dbStats" class="text-sm text-gray-600 dark:text-gray-300 mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"></div>
+        <div class="flex flex-wrap gap-2">
+          <button id="exportDbBtn"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700
+                   text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+            Export .db File
+          </button>
+          <button id="clearDbBtn"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 dark:bg-red-900/20
+                   text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+            Clear Database
+          </button>
+        </div>
+      </section>
+
+      <!-- ── Appearance ── -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Appearance</h3>
+
+        <!-- Dark mode -->
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <p class="text-sm font-medium">Dark Mode</p>
+            <p class="text-xs text-gray-400">Switch between light and dark theme</p>
+          </div>
+          <button id="darkModeToggle"
+            class="relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none"
+            style="background:var(--p)">
+            <span id="darkModeThumb"
+              class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"></span>
+          </button>
+        </div>
+
+        <!-- Theme color -->
+        <div>
+          <p class="text-sm font-medium mb-2">Theme Color</p>
+          <div id="themeColorPicker" class="flex flex-wrap gap-3"></div>
+        </div>
+      </section>
+
+      <!-- ── About ── -->
+      <section class="pb-2">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">About</h3>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Congregation Directory — browser-based person search powered by SQLite (sql.js).<br/>
+          All data is stored locally in your browser's IndexedDB storage.
+        </p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"
+  class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[60]
+         px-5 py-2.5 rounded-xl text-sm font-medium shadow-xl
+         bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
+         pointer-events-none transition-opacity"></div>
+
+<!-- ═══════════════════════ JAVASCRIPT ═══════════════════════ -->
+<script>
+'use strict';
+
+/* ─────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────── */
+const IDB_NAME    = 'congregation_directory';
+const IDB_VERSION = 1;
+const DB_KEY      = 'sqlite_db';
+const SETTINGS_KEY = 'dir_settings';
+const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
+
+const THEMES = {
+  blue:   { label:'Blue',   hex:'#3b82f6' },
+  indigo: { label:'Indigo', hex:'#6366f1' },
+  green:  { label:'Green',  hex:'#22c55e' },
+  purple: { label:'Purple', hex:'#a855f7' },
+  orange: { label:'Orange', hex:'#f97316' },
+  rose:   { label:'Rose',   hex:'#f43f5e' },
+};
+
+const TAG_COLORS = {
+  appointment:        'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+  congregation:       'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  family:             'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  field_service_group:'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  student:            'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+  usefor:             'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+  treasures:          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+  living:             'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
+  cbs:                'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  public:             'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
+  service:            'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+  duty:               'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+};
+
+const TAG_LABELS = {
+  appointment:         'Appointment',
+  congregation:        'Congregation Status',
+  family:              'Family',
+  field_service_group: 'Field Service Group',
+  student:             'OCLM / Student',
+  usefor:              'Meeting Assignments',
+  treasures:           'Treasures from God\'s Word',
+  living:              'Living as Christians',
+  cbs:                 'Congregation Bible Study',
+  public:              'Public Meeting',
+  service:             'Field Service',
+  duty:                'Hall Duties',
+};
+
+const TAG_ORDER = ['congregation','appointment','family','field_service_group',
+  'usefor','treasures','student','living','cbs','public','service','duty'];
+
+const AVATAR_COLORS = [
+  'bg-blue-500','bg-emerald-500','bg-purple-500','bg-amber-500',
+  'bg-rose-500','bg-teal-500','bg-indigo-500','bg-pink-500','bg-cyan-500',
+];
+
+/* ─────────────────────────────────────────
+   STATE
+───────────────────────────────────────── */
+let SQL          = null;     // sql.js module
+let db           = null;     // sql.js Database
+let availTags    = {};       // { type: [{name, count}] }
+let activeFilters = [];      // [{id, name, tagType, mode:'include'|'exclude'}]
+let filterMode   = 'AND';
+let searchText   = '';
+let autoSyncTimer = null;
+
+let settings = {
+  csvUrl:           '',
+  csvUsername:      '',
+  csvPassword:      '',
+  autoSyncInterval: 0,
+  darkMode:         window.matchMedia('(prefers-color-scheme: dark)').matches,
+  theme:            'blue',
+  lastSync:         null,
+};
+
+/* ─────────────────────────────────────────
+   SETTINGS
+───────────────────────────────────────── */
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    Object.assign(settings, s);
+  } catch(_) {}
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/* ─────────────────────────────────────────
+   INDEXEDDB
+───────────────────────────────────────── */
+function openIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function idbPut(key, value) {
+  const idb = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = idb.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(value, key);
+    tx.oncomplete = res;
+    tx.onerror    = rej;
+  });
+}
+
+async function idbGet(key) {
+  const idb = await openIDB();
+  return new Promise((res, rej) => {
+    const tx  = idb.transaction('kv', 'readonly');
+    const req = tx.objectStore('kv').get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = rej;
+  });
+}
+
+async function idbDelete(key) {
+  const idb = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = idb.transaction('kv', 'readwrite');
+    tx.objectStore('kv').delete(key);
+    tx.oncomplete = res;
+    tx.onerror    = rej;
+  });
+}
+
+/* ─────────────────────────────────────────
+   SQL DATABASE
+───────────────────────────────────────── */
+async function initSQL() {
+  SQL = await initSqlJs({ locateFile: f => SQL_WASM_CDN + f });
+}
+
+function createSchema() {
+  db.run(`PRAGMA foreign_keys = OFF;`);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS congregations (
+      id   INTEGER PRIMARY KEY,
+      name TEXT
+    );
+    CREATE TABLE IF NOT EXISTS field_service_groups (
+      id               INTEGER PRIMARY KEY,
+      congregation_id  INTEGER,
+      name             TEXT,
+      overseer         TEXT,
+      overseer_id      INTEGER,
+      assistant        TEXT,
+      assistant_id     INTEGER,
+      phone            TEXT
+    );
+    CREATE TABLE IF NOT EXISTS families (
+      id                     INTEGER PRIMARY KEY,
+      name                   TEXT,
+      field_service_group_id INTEGER,
+      field_service_group_name TEXT,
+      family_head_id         INTEGER,
+      family_head            TEXT,
+      address                TEXT,
+      city                   TEXT,
+      state                  TEXT,
+      postal_code            TEXT,
+      moved                  INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS persons (
+      id                         INTEGER PRIMARY KEY,
+      category                   TEXT,
+      first_name                 TEXT,
+      last_name                  TEXT,
+      display_name               TEXT,
+      gender                     TEXT,
+      date_of_birth              TEXT,
+      address                    TEXT,
+      city                       TEXT,
+      state                      TEXT,
+      postal_code                TEXT,
+      full_address               TEXT,
+      mobile                     TEXT,
+      email                      TEXT,
+      congregation_id            INTEGER,
+      field_service_group_id     INTEGER,
+      field_service_group_name   TEXT,
+      family_id                  INTEGER,
+      family_name                TEXT,
+      baptized                   INTEGER,
+      date_of_baptism            TEXT,
+      elder                      INTEGER,
+      ministerial_servant        INTEGER,
+      special_pioneer            INTEGER,
+      pioneer                    INTEGER,
+      regular_auxiliary          INTEGER,
+      anointed                   INTEGER,
+      family_head                INTEGER,
+      clm_student                INTEGER,
+      inactive                   INTEGER,
+      infirm                     INTEGER,
+      moved                      INTEGER,
+      removed                    INTEGER,
+      date_removed               TEXT,
+      bind                       INTEGER,
+      deaf                       INTEGER,
+      child                      INTEGER,
+      incarcerated               INTEGER,
+      regular                    INTEGER,
+      clm_chairman               INTEGER,
+      clm_auxiliary_counselor    INTEGER,
+      prayer                     INTEGER,
+      clm_treasures              INTEGER,
+      clm_gems                   INTEGER,
+      clm_bible_reading          INTEGER,
+      clm_initial_call           INTEGER,
+      clm_follow_up              INTEGER,
+      clm_making_disciples       INTEGER,
+      clm_explaining_beliefs     INTEGER,
+      clm_talk                   INTEGER,
+      clm_assistant              INTEGER,
+      clm_living_as_christians_parts INTEGER,
+      clm_cbs_conductor          INTEGER,
+      clm_cbs_reader             INTEGER,
+      public_talks_local         INTEGER,
+      public_talks_away          INTEGER,
+      public_meeting_chairman    INTEGER,
+      watchtower_reader          INTEGER,
+      public_witnessing          INTEGER,
+      public_witnessing_key_person INTEGER,
+      meeting_for_service_conductor INTEGER,
+      meeting_for_service_prayer INTEGER,
+      auditorium_attendant       INTEGER,
+      entrance_attendant         INTEGER,
+      video_conference_host      INTEGER,
+      microphones                INTEGER,
+      av_operator                INTEGER,
+      av_stage                   INTEGER,
+      maintenance_volunteer      INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS tags (
+      person_id INTEGER,
+      type      TEXT,
+      name      TEXT,
+      value     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_tags_pid  ON tags(person_id);
+    CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
+    CREATE INDEX IF NOT EXISTS idx_persons_name ON persons(last_name, first_name);
+  `);
+}
+
+function freshDb() {
+  if (db) { db.close(); db = null; }
+  db = new SQL.Database();
+  createSchema();
+}
+
+async function persistDb() {
+  if (!db) return;
+  await idbPut(DB_KEY, db.export());
+}
+
+async function loadDbFromStorage() {
+  const data = await idbGet(DB_KEY);
+  if (!data) return false;
+  try {
+    db = new SQL.Database(data);
+    return true;
+  } catch(e) {
+    console.error('DB load failed:', e);
+    return false;
+  }
+}
+
+/* ─────────────────────────────────────────
+   CSV PARSING
+───────────────────────────────────────── */
+function parseCSV(raw) {
+  // Strip BOM
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+
+  const rows = [];
+  let i = 0, n = raw.length;
+
+  function nextField() {
+    let val = '';
+    if (i >= n) return null;
+    if (raw[i] === '"') {
+      i++; // skip opening quote
+      while (i < n) {
+        if (raw[i] === '"') {
+          if (raw[i+1] === '"') { val += '"'; i += 2; }
+          else { i++; break; } // closing quote
+        } else {
+          val += raw[i++];
+        }
+      }
+      // skip comma or newline after closing quote
+    } else {
+      while (i < n && raw[i] !== ',' && raw[i] !== '\n' && raw[i] !== '\r') {
+        val += raw[i++];
+      }
+    }
+    return val;
+  }
+
+  function nextRow() {
+    const fields = [];
+    while (i < n) {
+      const f = nextField();
+      if (f === null) break;
+      fields.push(f);
+      if (i < n) {
+        if (raw[i] === ',') { i++; } // more fields
+        else if (raw[i] === '\r') { i++; if (raw[i] === '\n') i++; break; }
+        else if (raw[i] === '\n') { i++; break; }
+      }
+    }
+    return fields;
+  }
+
+  const headerRow = nextRow();
+  if (!headerRow.length) return [];
+  const headers = headerRow.map(h => h.trim());
+
+  while (i < n) {
+    const vals = nextRow();
+    if (!vals.length || (vals.length === 1 && vals[0] === '')) continue;
+    const row = {};
+    headers.forEach((h, j) => { row[h] = vals[j] !== undefined ? vals[j] : ''; });
+    rows.push(row);
+  }
+  return rows;
+}
+
+/* ─────────────────────────────────────────
+   ADDRESS PARSING (simplified)
+───────────────────────────────────────── */
+function parseAddress(raw) {
+  if (!raw || !raw.trim()) return { address:'', city:'', state:'', postal_code:'' };
+  const cleaned = raw.replace(/[\r\n]+/g,' ').replace(/\s{2,}/g,' ').trim();
+  // Pattern: "... City ST 12345" or "... City, ST 12345"
+  const m = cleaned.match(/^(.*?),?\s+([A-Za-z][A-Za-z\s\.]+?)\s{1,3}([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (m) {
+    return {
+      address:     m[1].trim(),
+      city:        m[2].trim(),
+      state:       m[3].trim(),
+      postal_code: m[4].trim(),
+    };
+  }
+  return { address: cleaned, city:'', state:'', postal_code:'' };
+}
+
+/* ─────────────────────────────────────────
+   CSV → SQLITE IMPORT
+───────────────────────────────────────── */
+function b(val) { return (val === 'True' || val === 'true' || val === '1') ? 1 : 0; }
+function s(val) { return val !== undefined && val !== null ? String(val) : ''; }
+
+async function importCSVText(csvText) {
+  freshDb();
+
+  const rows = parseCSV(csvText);
+  if (!rows.length) throw new Error('No data rows found');
+
+  const tags        = [];
+  const families    = {};
+  const fsGroups    = {};
+  const movedIds    = new Set();
+
+  // ── Pass 1: Field Service Groups, Families, Overseer/Assistant tags ──
+  for (const row of rows) {
+    const pid       = parseInt(row['PersonID']);
+    const fsgId     = parseInt(row['FieldServiceGroupID'] || '0') || 0;
+    const fsgName   = (row['GroupName'] || '').trim();
+    const familyId  = parseInt(row['FamilyID'] || '0') || 0;
+    const isMoved   = row['Moved'] === 'True';
+
+    if (isMoved) movedIds.add(pid);
+
+    // FSG
+    if (fsgId && !(fsgId in fsGroups)) {
+      fsGroups[fsgId] = { id: fsgId, name: fsgName, congregation_id: 1,
+        overseer:'', overseer_id:0, assistant:'', assistant_id:0, phone:'' };
+    }
+    if (fsgId in fsGroups && !isMoved) {
+      const resp = (row['GroupResponsibility'] || '').trim();
+      const fullName = `${(row['FirstName']||'').trim()} ${(row['LastName']||'').trim()}`.trim();
+      if (resp === 'Overseer' && !fsGroups[fsgId].overseer_id) {
+        fsGroups[fsgId].overseer    = fullName;
+        fsGroups[fsgId].overseer_id = pid;
+        fsGroups[fsgId].phone       = (row['PhoneMobile'] || '').trim();
+        tags.push({ person_id: pid, type: 'field_service_group',
+          name: 'Field Service Group Overseer', value: fsgName });
+      } else if (resp === 'Assistant' && !fsGroups[fsgId].assistant_id) {
+        fsGroups[fsgId].assistant    = fullName;
+        fsGroups[fsgId].assistant_id = pid;
+        tags.push({ person_id: pid, type: 'field_service_group',
+          name: 'Field Service Group Assistant', value: fsgName });
+      }
+    }
+
+    // Family
+    if (row['FamilyHead'] === 'True' && familyId > 0 && !(familyId in families)) {
+      const addr = parseAddress(row['Address'] || '');
+      const familyName = (row['FamilyName'] || '').trim() || (row['LastName'] || '').trim();
+      families[familyId] = {
+        id: familyId, name: familyName,
+        field_service_group_id: isMoved ? 0 : fsgId,
+        field_service_group_name: isMoved ? 'Unassigned' : fsgName,
+        family_head_id: pid,
+        family_head: `${(row['FirstName']||'').trim()} ${(row['LastName']||'').trim()}`.trim(),
+        address: addr.address, city: addr.city, state: addr.state,
+        postal_code: addr.postal_code,
+        moved: isMoved ? 1 : 0,
+      };
+      tags.push({ person_id: pid, type: 'family', name: 'Family Head', value: familyName });
+    }
+  }
+
+  // Insert congregation placeholder
+  db.run(`INSERT OR REPLACE INTO congregations VALUES (1,'Congregation')`);
+
+  // Insert FSGs
+  const fsgStmt = db.prepare(
+    `INSERT OR REPLACE INTO field_service_groups VALUES (?,?,?,?,?,?,?,?)`);
+  for (const g of Object.values(fsGroups)) {
+    fsgStmt.run([g.id, g.congregation_id, g.name, g.overseer, g.overseer_id,
+                 g.assistant, g.assistant_id, g.phone]);
+  }
+  fsgStmt.free();
+
+  // Insert families
+  const famStmt = db.prepare(
+    `INSERT OR REPLACE INTO families VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  for (const f of Object.values(families)) {
+    famStmt.run([f.id, f.name, f.field_service_group_id, f.field_service_group_name,
+                 f.family_head_id, f.family_head, f.address, f.city, f.state,
+                 f.postal_code, f.moved]);
+  }
+  famStmt.free();
+
+  // ── Pass 2: Persons + tags ──
+  const persStmt = db.prepare(`INSERT OR REPLACE INTO persons VALUES (
+    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+  )`);
+
+  for (const row of rows) {
+    const pid      = parseInt(row['PersonID']);
+    const familyId = parseInt(row['FamilyID'] || '0') || 0;
+    const fsgId    = parseInt(row['FieldServiceGroupID'] || '0') || 0;
+    const fsgName  = (row['GroupName'] || '').trim();
+    const isMoved  = row['Moved'] === 'True';
+    const privilege = (row['Privilege'] || '').trim();
+    const pioneerStatus = (row['PioneerStatus'] || '').trim();
+
+    const addr = parseAddress(row['Address'] || '');
+    const firstName = (row['FirstName'] || '').trim();
+    const lastName  = (row['LastName']  || '').trim();
+
+    let familyName = (row['FamilyName'] || '').trim();
+    if (!familyName && familyId in families) familyName = families[familyId].name;
+    if (!familyName) familyName = lastName;
+
+    const effFsgId   = (isMoved || familyId < 1) ? 0 : fsgId;
+    const effFsgName = (isMoved || familyId < 1) ? 'Unassigned' : fsgName;
+    const effFamId   = familyId > 0 ? familyId : 0;
+
+    const elder      = privilege === 'E'  ? 1 : 0;
+    const ms         = privilege === 'MS' ? 1 : 0;
+    const baptized   = (privilege === 'E' || privilege === 'MS' || privilege === 'PUB') ? 1 : 0;
+    const pioneer    = pioneerStatus === 'RegularPioneer'   ? 1 : 0;
+    const regAux     = pioneerStatus === 'AuxiliaryPioneer' ? 1 : 0;
+    const spPioneer  = pioneerStatus === 'SpecialPioneer'   ? 1 : 0;
+    const inactive   = row['Active'] === 'False' ? 1 : 0;
+    const category   = privilege === 'No' ? 'associated' : 'publisher';
+
+    persStmt.run([
+      pid, category, firstName, lastName,
+      `${firstName} ${lastName}`.trim(),
+      (row['Gender'] || '').trim(),
+      (row['DOB'] || '').trim(),
+      addr.address, addr.city, addr.state, addr.postal_code,
+      `${addr.address} ${addr.city}, ${addr.state} ${addr.postal_code}`.trim(),
+      (row['PhoneMobile'] || '').trim(),
+      (row['Email'] || '').trim(),
+      1, effFsgId, effFsgName, effFamId, familyName,
+      baptized, (row['DateOfBaptism'] || '').trim(),
+      elder, ms, spPioneer, pioneer, regAux,
+      row['Anointed']     === 'True' ? 1 : 0,
+      row['FamilyHead']   === 'True' ? 1 : 0,
+      row['CLMStudent']   === 'True' ? 1 : 0,
+      inactive,
+      row['ElderlyInfirm'] === 'True' ? 1 : 0,
+      isMoved ? 1 : 0,
+      row['Removed'] === 'True' ? 1 : 0,
+      (row['DateOfRemoved'] || '').trim(),
+      row['Blind']       === 'True' ? 1 : 0,
+      row['Deaf']        === 'True' ? 1 : 0,
+      row['Child']       === 'True' ? 1 : 0,
+      row['Incarcerated'] === 'True' ? 1 : 0,
+      row['Regular'] === 'False' ? 0 : 1,
+      b(row['UseForChairman']),
+      b(row['UseForAuxiliaryCounselor']),
+      b(row['UseForPrayers']),
+      b(row['UseForTreasuresTalk']),
+      b(row['UseForTreasuresGems']),
+      b(row['UseForTreasuresBR']),
+      b(row['UseForApplyIC']),
+      b(row['UseForApplyRV']),
+      b(row['UseForApplyBS']),
+      b(row['UseForApplyExplaining']),
+      b(row['UseForApplyStudentTalk']),
+      b(row['UseForApplyAssistant']),
+      b(row['UseForLivingParts']),
+      b(row['UseForCBS']),
+      b(row['UseForCBSReader']),
+      b(row['UseForPublicTalksLocal']),
+      b(row['UseForPublicTalksAway']),
+      b(row['UseForWeekendChairman']),
+      b(row['UseForWatchtowerReader']),
+      b(row['UseForPublicWitnessing']),
+      b(row['UseForPublicWitnessingKeyPerson']),
+      b(row['UseForConductFSGroups']),
+      b(row['UseForFSPrayers']),
+      b(row['UseForDuty1']),
+      b(row['UseForDuty2']),
+      b(row['UseForDuty3']),
+      b(row['UseForDuty4']),
+      b(row['UseForDuty6']),
+      b(row['UseForDuty7']),
+      b(row['UseForMaintenance']),
+    ]);
+
+    // ── Generate tags ──
+    // Field service group
+    if (effFsgId > 0) {
+      tags.push({ person_id: pid, type:'congregation', name:'Field Service Group', value: effFsgName });
+    }
+    // Gender
+    const gender = (row['Gender'] || '').trim();
+    if (gender) tags.push({ person_id: pid, type:'family', name: gender, value:'' });
+    // Family
+    if (familyName) tags.push({ person_id: pid, type:'family', name:'Family', value: familyName });
+
+    // Privilege
+    if (privilege === 'E') {
+      tags.push({ person_id: pid, type:'appointment',  name:'Elder',              value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
+    } else if (privilege === 'MS') {
+      tags.push({ person_id: pid, type:'appointment',  name:'Ministerial Servant',value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
+    } else if (privilege === 'PUB') {
+      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
+    } else if (privilege === 'UBP') {
+      tags.push({ person_id: pid, type:'congregation', name:'Unbaptized Publisher',value:'' });
+    } else if (privilege === 'No') {
+      tags.push({ person_id: pid, type:'congregation', name:'Associated Family',  value:'' });
+    }
+
+    // Active / Inactive
+    tags.push({ person_id: pid, type:'congregation',
+      name: inactive ? 'Inactive' : 'Active', value:'' });
+
+    // Pioneer
+    if (pioneer)   tags.push({ person_id:pid, type:'appointment', name:'Regular Pioneer',              value:'' });
+    if (regAux)    tags.push({ person_id:pid, type:'appointment', name:'Continuous Auxiliary Pioneer', value:'' });
+    if (spPioneer) tags.push({ person_id:pid, type:'appointment', name:'Special Pioneer',              value:'' });
+
+    // CLM Student
+    if (row['CLMStudent'] === 'True')
+      tags.push({ person_id:pid, type:'student', name:'OCLM Enrolled', value:'' });
+
+    // UseFor map
+    const useForMap = [
+      ['UseForChairman',              'usefor',   'Midweek Chairman'],
+      ['UseForAuxiliaryCounselor',    'usefor',   'Midweek Classroom Counselor'],
+      ['UseForPrayers',               'usefor',   'Prayer'],
+      ['UseForTreasuresTalk',         'treasures','Treasure from God\'s Word'],
+      ['UseForTreasuresGems',         'treasures','Digging for Spiritual Gems'],
+      ['UseForTreasuresBR',           'student',  'Bible Reading'],
+      ['UseForApplyIC',               'student',  'Initial Call'],
+      ['UseForApplyRV',               'student',  'Follow Up'],
+      ['UseForApplyBS',               'student',  'Making Disciples'],
+      ['UseForApplyExplaining',       'student',  'Explaining Beliefs'],
+      ['UseForApplyStudentTalk',      'student',  'Talks'],
+      ['UseForApplyAssistant',        'student',  'Assistant'],
+      ['UseForLivingParts',           'living',   'Living as Christians Parts'],
+      ['UseForCBS',                   'cbs',      'Congregation Bible Study Conductor'],
+      ['UseForCBSReader',             'cbs',      'Congregation Bible Study Reader'],
+      ['UseForPublicTalksLocal',      'public',   'Local Public Talks'],
+      ['UseForPublicTalksAway',       'public',   'Away Public Talks'],
+      ['UseForWeekendChairman',       'public',   'Weekend Chairman'],
+      ['UseForWatchtowerReader',      'public',   'Watchtower Reader'],
+      ['UseForPublicWitnessing',      'service',  'Local Public Witnessing'],
+      ['UseForPublicWitnessingKeyPerson','service','Local Public Witnessing Key Person'],
+      ['UseForConductFSGroups',       'service',  'Meeting for Field Service Conductor'],
+      ['UseForFSPrayers',             'service',  'Meeting for Field Service Prayer'],
+      ['UseForMaintenance',           'service',  'Local Maintenance Volunteer'],
+      ['UseForDuty1',                 'duty',     'Auditorium Attendant'],
+      ['UseForDuty2',                 'duty',     'Entrance Attendant'],
+      ['UseForDuty3',                 'duty',     'Video Conference Host'],
+      ['UseForDuty4',                 'duty',     'Microphone Carrier'],
+      ['UseForDuty6',                 'duty',     'Audio/Video Operator'],
+      ['UseForDuty7',                 'duty',     'Stage Attendant'],
+    ];
+    for (const [col, type, name] of useForMap) {
+      if (row[col] === 'True') tags.push({ person_id:pid, type, name, value:'' });
+    }
+  }
+
+  persStmt.free();
+
+  // Insert tags in one transaction
+  db.run('BEGIN');
+  const tagStmt = db.prepare(`INSERT INTO tags VALUES (?,?,?,?)`);
+  for (const t of tags) tagStmt.run([t.person_id, t.type, t.name, t.value]);
+  tagStmt.free();
+  db.run('COMMIT');
+
+  await persistDb();
+  return rows.length;
+}
+
+/* ─────────────────────────────────────────
+   SEARCH
+───────────────────────────────────────── */
+function buildQuery() {
+  const where = [];
+  const params = [];
+
+  if (searchText.trim()) {
+    const q = `%${searchText.trim()}%`;
+    where.push(`(p.first_name LIKE ? OR p.last_name LIKE ? OR p.display_name LIKE ?)`);
+    params.push(q, q, q);
+  }
+
+  const inc = activeFilters.filter(f => f.mode === 'include');
+  const exc = activeFilters.filter(f => f.mode === 'exclude');
+
+  for (const f of exc) {
+    where.push(`p.id NOT IN (SELECT person_id FROM tags WHERE name=?)`);
+    params.push(f.name);
+  }
+
+  if (inc.length) {
+    if (filterMode === 'AND') {
+      for (const f of inc) {
+        where.push(`p.id IN (SELECT person_id FROM tags WHERE name=?)`);
+        params.push(f.name);
+      }
+    } else {
+      where.push(`(${inc.map(() => `p.id IN (SELECT person_id FROM tags WHERE name=?)`).join(' OR ')})`);
+      inc.forEach(f => params.push(f.name));
+    }
+  }
+
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  return {
+    sql: `SELECT DISTINCT p.id, p.first_name, p.last_name, p.display_name,
+            p.mobile, p.email, p.field_service_group_name, p.family_name,
+            p.gender, p.category, p.full_address,
+            p.elder, p.ministerial_servant, p.pioneer, p.regular_auxiliary,
+            p.special_pioneer, p.inactive, p.moved, p.removed, p.child,
+            p.date_of_birth, p.date_of_baptism
+          FROM persons p ${w}
+          ORDER BY p.last_name, p.first_name
+          LIMIT 1000`,
+    params,
+  };
+}
+
+function execSearch() {
+  if (!db) return [];
+  try {
+    const { sql, params } = buildQuery();
+    const res = db.exec(sql, params);
+    if (!res.length) return [];
+    const cols = res[0].columns;
+    return res[0].values.map(row => {
+      const obj = {};
+      cols.forEach((c,i) => obj[c] = row[i]);
+      return obj;
+    });
+  } catch(e) {
+    console.error('Search error:', e);
+    return [];
+  }
+}
+
+function loadAvailTags() {
+  availTags = {};
+  if (!db) return;
+  try {
+    const res = db.exec(
+      `SELECT DISTINCT type, name, COUNT(*) as c FROM tags GROUP BY type, name ORDER BY type, name`
+    );
+    if (!res.length) return;
+    for (const [type, name, count] of res[0].values) {
+      if (!availTags[type]) availTags[type] = [];
+      availTags[type].push({ name, count });
+    }
+  } catch(e) { console.error(e); }
+}
+
+function getPersonTags(pid) {
+  if (!db) return [];
+  try {
+    const res = db.exec(`SELECT type, name, value FROM tags WHERE person_id=? ORDER BY type, name`, [pid]);
+    if (!res.length) return [];
+    return res[0].values.map(([type, name, value]) => ({ type, name, value }));
+  } catch(e) { return []; }
+}
+
+function dbStats() {
+  if (!db) return null;
+  try {
+    return {
+      persons:  db.exec(`SELECT COUNT(*) FROM persons`)[0].values[0][0],
+      families: db.exec(`SELECT COUNT(*) FROM families`)[0].values[0][0],
+      groups:   db.exec(`SELECT COUNT(*) FROM field_service_groups`)[0].values[0][0],
+    };
+  } catch(e) { return null; }
+}
+
+/* ─────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────── */
+function h(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function initials(first, last) {
+  return `${(first||'').charAt(0)}${(last||'').charAt(0)}`.toUpperCase();
+}
+
+function avatarColor(name) {
+  let hash = 0;
+  for (const c of (name||'')) hash = c.charCodeAt(0) + ((hash<<5)-hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function tagBadge(type) {
+  return TAG_COLORS[type] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+}
+
+/* ─────────────────────────────────────────
+   RENDER
+───────────────────────────────────────── */
+function renderResults() {
+  const persons   = execSearch();
+  const grid      = document.getElementById('resultsGrid');
+  const empty     = document.getElementById('emptyState');
+  const noRes     = document.getElementById('noResults');
+  const hdr       = document.getElementById('resultsHeader');
+  const countEl   = document.getElementById('resultsCount');
+
+  if (!db) {
+    empty.classList.remove('hidden');
+    grid.classList.add('hidden');
+    hdr.classList.add('hidden');
+    noRes.classList.add('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+  const stats = dbStats();
+
+  if (!persons.length) {
+    grid.classList.add('hidden');
+    hdr.classList.add('hidden');
+    noRes.classList.remove('hidden');
+    return;
+  }
+
+  noRes.classList.add('hidden');
+  grid.classList.remove('hidden');
+  hdr.classList.remove('hidden');
+  countEl.textContent = `${persons.length} of ${stats?.persons ?? 0} persons`;
+
+  grid.innerHTML = persons.map(renderCard).join('');
+}
+
+function renderCard(p) {
+  const av    = avatarColor(p.last_name || p.display_name || '');
+  const ini   = initials(p.first_name, p.last_name);
+  const name  = h(p.display_name || `${p.first_name} ${p.last_name}`);
+  const fsg   = p.field_service_group_name && p.field_service_group_name !== 'Unassigned'
+                  ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">${h(p.field_service_group_name)}</div>` : '';
+  const fam   = p.family_name ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">${h(p.family_name)}</div>` : '';
+  const phone = p.mobile
+    ? `<a href="tel:${h(p.mobile)}" class="text-xs text-primary mt-1.5 block truncate" onclick="event.stopPropagation()">📞 ${h(p.mobile)}</a>`
+    : '';
+
+  let badges = '';
+  if (p.elder)              badges += badgePill('appointment','Elder');
+  else if (p.ministerial_servant) badges += badgePill('appointment','MS');
+  if (p.special_pioneer)   badges += badgePill('appointment','Sp.Pioneer');
+  else if (p.pioneer)       badges += badgePill('appointment','Pioneer');
+  else if (p.regular_auxiliary) badges += badgePill('appointment','Aux.Pio.');
+  if (p.inactive) badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Inactive</span>`;
+  if (p.moved)    badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">Moved</span>`;
+  if (p.child)    badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">Child</span>`;
+  if (p.removed)  badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Removed</span>`;
+
+  return `
+    <div class="person-card bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm
+                border border-gray-100 dark:border-gray-800 cursor-pointer"
+         onclick="openPersonDetail(${p.id})">
+      <div class="flex items-start gap-3">
+        <div class="flex-shrink-0 w-10 h-10 rounded-full ${av}
+                    flex items-center justify-center text-white font-bold text-sm">${ini}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm truncate">${name}</div>
+          ${fsg}${fam}
+        </div>
+      </div>
+      ${badges ? `<div class="flex flex-wrap gap-1 mt-2">${badges}</div>` : ''}
+      ${phone}
+    </div>`;
+}
+
+function badgePill(type, label) {
+  return `<span class="inline-flex px-1.5 py-0.5 rounded text-xs ${tagBadge(type)}">${h(label)}</span>`;
+}
+
+function renderTagPanel(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  if (!Object.keys(availTags).length) {
+    el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No tags available.<br/>Import a CSV first.</p>';
+    return;
+  }
+
+  const types = [
+    ...TAG_ORDER.filter(t => t in availTags),
+    ...Object.keys(availTags).filter(t => !TAG_ORDER.includes(t)),
+  ];
+
+  el.innerHTML = types.map(type => {
+    const typeTags = availTags[type] || [];
+    const label    = TAG_LABELS[type] || type;
+    const chips    = typeTags.map(tag => {
+      const af = activeFilters.find(f => f.name === tag.name && f.tagType === type);
+      const cls = af
+        ? (af.mode === 'include'
+            ? 'chip-include border-[var(--p)]'
+            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-700')
+        : `${tagBadge(type)} border-transparent hover:border-current`;
+      const pre = af?.mode === 'exclude' ? '✕ ' : '';
+      return `<button
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+               font-medium border transition-all ${cls}"
+        onclick="toggleTagFilter(${JSON.stringify(tag.name)},${JSON.stringify(type)})"
+        title="${h(tag.name)} (${tag.count} persons)">
+        ${pre}${h(tag.name)}<span class="opacity-50 text-[10px]">${tag.count}</span>
+      </button>`;
+    }).join('');
+
+    return `
+      <div class="tag-group">
+        <button class="w-full flex items-center justify-between text-xs font-semibold
+                       text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5
+                       hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                onclick="this.nextElementSibling.classList.toggle('hidden');
+                         this.querySelector('.chevron').classList.toggle('rotate-180')">
+          <span>${h(label)}</span>
+          <svg class="chevron w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div class="flex flex-wrap gap-1 mb-1">${chips}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderActiveFilters() {
+  const bar    = document.getElementById('activeFiltersBar');
+  const chips  = document.getElementById('filterChips');
+  const badge  = document.getElementById('filterBadge');
+  const toggle = document.getElementById('andOrToggle');
+
+  toggle.textContent = filterMode;
+
+  if (!activeFilters.length) {
+    bar.classList.add('hidden');
+    badge.classList.add('hidden');
+    return;
+  }
+
+  bar.classList.remove('hidden');
+  badge.classList.remove('hidden');
+  badge.textContent = activeFilters.length;
+
+  chips.innerHTML = activeFilters.map(f => {
+    const cls = f.mode === 'include'
+      ? 'chip-include'
+      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+    const prefix = f.mode === 'exclude' ? '✕ NOT ' : '';
+    return `
+      <span class="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium ${cls}">
+        ${prefix}${h(f.name)}
+        <button onclick="toggleTagFilter(${JSON.stringify(f.name)},${JSON.stringify(f.tagType)})"
+                class="ml-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5">
+          <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </span>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────
+   INTERACTIONS
+───────────────────────────────────────── */
+function toggleTagFilter(tagName, tagType) {
+  const idx = activeFilters.findIndex(f => f.name === tagName && f.tagType === tagType);
+  if (idx === -1) {
+    activeFilters.push({ id: Date.now(), name: tagName, tagType, mode: 'include' });
+  } else if (activeFilters[idx].mode === 'include') {
+    activeFilters[idx].mode = 'exclude';
+  } else {
+    activeFilters.splice(idx, 1);
+  }
+  renderActiveFilters();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderResults();
+}
+
+function openPersonDetail(pid) {
+  if (!db) return;
+  const res = db.exec(`SELECT * FROM persons WHERE id=?`, [pid]);
+  if (!res.length || !res[0].values.length) return;
+
+  const cols = res[0].columns;
+  const p = {};
+  cols.forEach((c,i) => p[c] = res[0].values[0][i]);
+
+  const tags = getPersonTags(pid);
+  const byType = {};
+  tags.forEach(t => { if (!byType[t.type]) byType[t.type] = []; byType[t.type].push(t); });
+
+  // Avatar
+  const av = document.getElementById('personModalAvatar');
+  av.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${avatarColor(p.last_name||p.display_name||'')}`;
+  av.textContent = initials(p.first_name, p.last_name);
+
+  document.getElementById('personModalName').textContent = p.display_name || `${p.first_name} ${p.last_name}`;
+  document.getElementById('personModalSub').textContent  = p.field_service_group_name || '';
+
+  let html = '';
+
+  // Contact block
+  const contacts = [];
+  if (p.mobile) contacts.push(`<a href="tel:${h(p.mobile)}" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><span class="text-xl">📞</span><span class="text-sm text-primary">${h(p.mobile)}</span></a>`);
+  if (p.email)  contacts.push(`<a href="mailto:${h(p.email)}" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><span class="text-xl">✉️</span><span class="text-sm text-primary break-all">${h(p.email)}</span></a>`);
+  if (p.full_address && p.full_address.trim()) contacts.push(`<div class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"><span class="text-xl">📍</span><span class="text-sm text-gray-600 dark:text-gray-300">${h(p.full_address)}</span></div>`);
+  if (contacts.length) html += `<div class="space-y-2">${contacts.join('')}</div>`;
+
+  // Info grid
+  const info = [];
+  if (p.field_service_group_name) info.push(['Field Service Group', p.field_service_group_name]);
+  if (p.family_name) info.push(['Family', p.family_name]);
+  if (p.gender)  info.push(['Gender', p.gender]);
+  if (p.date_of_birth && p.date_of_birth !== '0001/01/01') info.push(['Date of Birth', p.date_of_birth]);
+  if (p.date_of_baptism) info.push(['Baptized', p.date_of_baptism]);
+  if (p.category) info.push(['Category', p.category]);
+  if (info.length) {
+    html += `<div class="grid grid-cols-2 gap-3">` +
+      info.map(([k,v]) => `
+        <div class="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <div class="text-xs text-gray-400 mb-0.5">${h(k)}</div>
+          <div class="text-sm font-medium capitalize">${h(v)}</div>
+        </div>`).join('') + `</div>`;
+  }
+
+  // Tags
+  const allTypes = [
+    ...TAG_ORDER.filter(t => t in byType),
+    ...Object.keys(byType).filter(t => !TAG_ORDER.includes(t)),
+  ];
+  if (allTypes.length) {
+    html += `<div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Tags</p>
+      <div class="space-y-3">` +
+      allTypes.map(type => `
+        <div>
+          <p class="text-xs text-gray-400 mb-1.5">${h(TAG_LABELS[type] || type)}</p>
+          <div class="flex flex-wrap gap-1.5">
+            ${byType[type].map(t => `
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${tagBadge(type)}">
+                ${h(t.name)}${t.value ? `: ${h(t.value)}` : ''}
+              </span>`).join('')}
+          </div>
+        </div>`).join('') +
+      `</div></div>`;
+  }
+
+  document.getElementById('personModalContent').innerHTML = html;
+  document.getElementById('personModal').classList.remove('hidden');
+}
+
+/* ─────────────────────────────────────────
+   THEME & APPEARANCE
+───────────────────────────────────────── */
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', settings.theme || 'blue');
+  if (settings.darkMode) document.documentElement.classList.add('dark');
+  else                   document.documentElement.classList.remove('dark');
+}
+
+function renderThemePicker() {
+  const el = document.getElementById('themeColorPicker');
+  el.innerHTML = Object.entries(THEMES).map(([key, t]) => `
+    <button onclick="selectTheme('${key}')"
+      class="w-9 h-9 rounded-full border-4 transition-all focus:outline-none
+             ${settings.theme === key
+               ? 'border-gray-700 dark:border-white scale-110 shadow-lg'
+               : 'border-transparent hover:scale-105'}"
+      style="background:${t.hex}" title="${t.label}"></button>
+  `).join('');
+}
+
+function selectTheme(key) {
+  settings.theme = key;
+  saveSettings();
+  applyTheme();
+  renderThemePicker();
+}
+
+function syncDarkModeUI() {
+  const thumb  = document.getElementById('darkModeThumb');
+  if (settings.darkMode) {
+    thumb.style.transform = 'translateX(24px)';
+  } else {
+    thumb.style.transform = 'translateX(0)';
+  }
+}
+
+/* ─────────────────────────────────────────
+   URL FETCH
+───────────────────────────────────────── */
+async function fetchCSVFromURL(statusElId) {
+  const url  = document.getElementById('csvUrlInput').value.trim() || settings.csvUrl;
+  const user = document.getElementById('csvUsernameInput').value.trim();
+  const pass = document.getElementById('csvPasswordInput').value;
+
+  if (!url) { toast('Please enter a URL'); return; }
+
+  const statusEl = document.getElementById(statusElId);
+  if (statusEl) statusEl.textContent = '⏳ Fetching…';
+
+  try {
+    const headers = {};
+    if (user || pass) headers['Authorization'] = 'Basic ' + btoa(`${user}:${pass}`);
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+    const text  = await res.text();
+    const count = await importCSVText(text);
+
+    settings.lastSync = new Date().toISOString();
+    settings.csvUrl      = url;
+    settings.csvUsername = user;
+    settings.csvPassword = pass;
+    saveSettings();
+
+    loadAvailTags();
+    renderResults();
+    renderTagPanel('tagPanelDesktop');
+    renderTagPanel('tagPanelMobile');
+    updateDbStats();
+
+    if (statusEl) statusEl.textContent = `✓ Imported ${count} persons`;
+    toast(`Imported ${count} persons from URL`);
+  } catch(e) {
+    const msg = `Error: ${e.message}`;
+    if (statusEl) statusEl.textContent = msg;
+    toast(msg);
+  }
+}
+
+function setupAutoSync() {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  if (settings.autoSyncInterval > 0 && settings.csvUrl) {
+    autoSyncTimer = setInterval(() => fetchCSVFromURL('fetchStatus'), settings.autoSyncInterval);
+  }
+}
+
+/* ─────────────────────────────────────────
+   TOAST
+───────────────────────────────────────── */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+/* ─────────────────────────────────────────
+   SETTINGS PANEL
+───────────────────────────────────────── */
+function openSettings() {
+  document.getElementById('csvUrlInput').value      = settings.csvUrl || '';
+  document.getElementById('csvUsernameInput').value = settings.csvUsername || '';
+  document.getElementById('csvPasswordInput').value = settings.csvPassword || '';
+  document.getElementById('autoSyncInterval').value = String(settings.autoSyncInterval || 0);
+  updateDbStats();
+  renderThemePicker();
+  syncDarkModeUI();
+  const last = document.getElementById('lastSyncInfo');
+  if (last) last.textContent = settings.lastSync
+    ? `Last synced: ${new Date(settings.lastSync).toLocaleString()}` : '';
+  document.getElementById('settingsModal').classList.remove('hidden');
+}
+
+function closeSettings() {
+  settings.csvUrl          = document.getElementById('csvUrlInput').value.trim();
+  settings.csvUsername     = document.getElementById('csvUsernameInput').value.trim();
+  settings.csvPassword     = document.getElementById('csvPasswordInput').value;
+  settings.autoSyncInterval = parseInt(document.getElementById('autoSyncInterval').value) || 0;
+  saveSettings();
+  setupAutoSync();
+  document.getElementById('settingsModal').classList.add('hidden');
+}
+
+function updateDbStats() {
+  const stats = dbStats();
+  const el = document.getElementById('dbStats');
+  if (!el) return;
+  if (!stats) {
+    el.textContent = 'No database loaded.';
+    return;
+  }
+  el.innerHTML = `
+    <div class="flex gap-4 flex-wrap">
+      <span>👤 <strong>${stats.persons}</strong> persons</span>
+      <span>👨‍👩‍👦 <strong>${stats.families}</strong> families</span>
+      <span>📋 <strong>${stats.groups}</strong> field service groups</span>
+    </div>`;
+}
+
+function exportDb() {
+  if (!db) { toast('No database to export'); return; }
+  const blob = new Blob([db.export()], { type:'application/x-sqlite3' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `congregation_${new Date().toISOString().slice(0,10)}.db`,
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function clearDb() {
+  if (!confirm('This will delete all directory data. Continue?')) return;
+  if (db) { db.close(); db = null; }
+  activeFilters = [];
+  availTags = {};
+  await idbDelete(DB_KEY);
+  settings.lastSync = null;
+  saveSettings();
+  renderResults();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderActiveFilters();
+  updateDbStats();
+  toast('Database cleared');
+}
+
+/* ─────────────────────────────────────────
+   INIT
+───────────────────────────────────────── */
+async function init() {
+  loadSettings();
+  applyTheme();
+
+  // Load sql.js
+  try {
+    await initSQL();
+  } catch(e) {
+    console.error('Failed to load sql.js:', e);
+    toast('⚠️ Failed to load database engine — check network connection');
+    return;
+  }
+
+  // Restore DB
+  const loaded = await loadDbFromStorage();
+  if (loaded) {
+    loadAvailTags();
+    renderTagPanel('tagPanelDesktop');
+    renderTagPanel('tagPanelMobile');
+  }
+  renderResults();
+
+  // Auto-sync: run if overdue
+  setupAutoSync();
+  if (settings.csvUrl && settings.autoSyncInterval > 0 && settings.lastSync) {
+    if (Date.now() - new Date(settings.lastSync).getTime() > settings.autoSyncInterval) {
+      fetchCSVFromURL('fetchStatus');
+    }
+  }
+
+  // ── Event listeners ──
+
+  // Search
+  document.getElementById('searchInput').addEventListener('input', e => {
+    searchText = e.target.value;
+    renderResults();
+  });
+
+  // Filter toggle (mobile)
+  document.getElementById('filterToggleBtn').addEventListener('click', () => {
+    const sheet = document.getElementById('filterSheet');
+    const panel = document.getElementById('filterSheetPanel');
+    sheet.classList.remove('hidden');
+    renderTagPanel('tagPanelMobile');
+    requestAnimationFrame(() => panel.classList.add('open'));
+  });
+
+  function closeFilterSheet() {
+    const panel = document.getElementById('filterSheetPanel');
+    panel.classList.remove('open');
+    setTimeout(() => document.getElementById('filterSheet').classList.add('hidden'), 300);
+  }
+  document.getElementById('filterSheetBackdrop').addEventListener('click', closeFilterSheet);
+  document.getElementById('closeFilterSheet').addEventListener('click', closeFilterSheet);
+
+  // AND/OR toggle
+  document.getElementById('andOrToggle').addEventListener('click', () => {
+    filterMode = filterMode === 'AND' ? 'OR' : 'AND';
+    renderActiveFilters();
+    renderResults();
+  });
+
+  // Clear filters
+  function clearAllFilters() {
+    activeFilters = [];
+    renderActiveFilters();
+    renderTagPanel('tagPanelDesktop');
+    renderTagPanel('tagPanelMobile');
+    renderResults();
+  }
+  document.getElementById('clearFiltersBtn').addEventListener('click', clearAllFilters);
+  document.getElementById('clearFiltersBtn2').addEventListener('click', clearAllFilters);
+
+  // Settings
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('emptyImportBtn').addEventListener('click', openSettings);
+  document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+  document.getElementById('settingsModalBackdrop').addEventListener('click', closeSettings);
+
+  // Person modal close
+  document.getElementById('personModalBackdrop').addEventListener('click', () =>
+    document.getElementById('personModal').classList.add('hidden'));
+  document.getElementById('closePersonModal').addEventListener('click', () =>
+    document.getElementById('personModal').classList.add('hidden'));
+
+  // Dark mode toggle
+  document.getElementById('darkModeToggle').addEventListener('click', () => {
+    settings.darkMode = !settings.darkMode;
+    saveSettings();
+    applyTheme();
+    syncDarkModeUI();
+  });
+
+  // CSV file input
+  const csvInput = document.getElementById('csvFileInput');
+  const dropZone = document.getElementById('csvDropZone');
+
+  csvInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      document.getElementById('csvDropLabel').innerHTML =
+        `<span class="font-medium text-primary">${h(file.name)}</span> selected`;
+      document.getElementById('importCsvBtn').disabled = false;
+    }
+  });
+
+  // Drag-and-drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-[var(--p)]'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-[var(--p)]'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-[var(--p)]');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      csvInput.files = e.dataTransfer.files;
+      document.getElementById('csvDropLabel').innerHTML =
+        `<span class="font-medium text-primary">${h(file.name)}</span> ready`;
+      document.getElementById('importCsvBtn').disabled = false;
+    }
+  });
+
+  document.getElementById('importCsvBtn').addEventListener('click', async () => {
+    const file = csvInput.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('importStatus');
+    statusEl.textContent = '⏳ Importing…';
+    try {
+      const text  = await file.text();
+      const count = await importCSVText(text);
+      settings.lastSync = new Date().toISOString();
+      saveSettings();
+      loadAvailTags();
+      renderResults();
+      renderTagPanel('tagPanelDesktop');
+      renderTagPanel('tagPanelMobile');
+      updateDbStats();
+      statusEl.textContent = `✓ Imported ${count} persons`;
+      toast(`Successfully imported ${count} persons`);
+    } catch(e) {
+      statusEl.textContent = `✗ ${e.message}`;
+      toast(`Import failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById('fetchNowBtn').addEventListener('click', () =>
+    fetchCSVFromURL('fetchStatus'));
+
+  document.getElementById('exportDbBtn').addEventListener('click', exportDb);
+  document.getElementById('clearDbBtn').addEventListener('click', clearDb);
+}
+
+// Expose globally for inline onclick handlers
+window.toggleTagFilter   = toggleTagFilter;
+window.openPersonDetail  = openPersonDetail;
+
+init().catch(console.error);
+</script>
+</body>
+</html>
