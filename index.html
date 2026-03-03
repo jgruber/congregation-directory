@@ -118,6 +118,18 @@
       class="hidden md:flex flex-col w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800
              bg-white dark:bg-gray-900 overflow-y-auto">
       <div class="p-4 flex-1">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Field Service Group</p>
+        <select id="fsgFilterDesktop"
+          class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-[var(--pr)] mb-4">
+          <option value="">All Groups</option>
+        </select>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Family Head</p>
+        <select id="familyFilterDesktop"
+          class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-[var(--pr)] mb-4">
+          <option value="">All Families</option>
+        </select>
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Age Range</p>
         <div class="flex items-center gap-2 mb-4">
           <input type="number" id="ageMinDesktop" min="0" max="120" placeholder="Min"
@@ -197,6 +209,18 @@
       </button>
     </div>
     <div class="overflow-y-auto p-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Field Service Group</p>
+      <select id="fsgFilterMobile"
+        class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+               bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-[var(--pr)] mb-4">
+        <option value="">All Groups</option>
+      </select>
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Family Head</p>
+      <select id="familyFilterMobile"
+        class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+               bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-[var(--pr)] mb-4">
+        <option value="">All Families</option>
+      </select>
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Age Range</p>
       <div class="flex items-center gap-2 mb-4">
         <input type="number" id="ageMinMobile" min="0" max="120" placeholder="Min"
@@ -458,6 +482,8 @@ let activeFilters = [];      // [{id, name, tagType, mode:'include'|'exclude'}]
 let filterMode   = 'AND';
 let ageMin       = null;     // minimum age filter (integer or null)
 let ageMax       = null;     // maximum age filter (integer or null)
+let fsgFilter    = null;     // selected FSG name or null
+let familyFilter = null;     // selected family head name or null
 let searchText   = '';
 let autoSyncTimer = null;
 
@@ -1076,6 +1102,9 @@ function buildQuery() {
     if (ageMax !== null) where.push(`${ageExpr} <= ${parseInt(ageMax)}`);
   }
 
+  if (fsgFilter)    where.push(`p.field_service_group_name = ${sq(fsgFilter)}`);
+  if (familyFilter) where.push(`p.family_name = ${sq(familyFilter)}`);
+
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   return {
     sql: `SELECT DISTINCT p.id, p.first_name, p.last_name, p.display_name,
@@ -1134,6 +1163,34 @@ function loadAvailTags() {
       availTags[type].push({ name, count });
     }
     if (DEBUG) console.log('[SQL] loadAvailTags → availTags:', JSON.parse(JSON.stringify(availTags)));
+  } catch(e) { console.error(e); }
+}
+
+function loadSelectOptions() {
+  if (!db) return;
+  try {
+    const fsgRes = db.exec(
+      `SELECT DISTINCT field_service_group_name FROM persons
+       WHERE field_service_group_name IS NOT NULL AND field_service_group_name != ''
+         AND field_service_group_name != 'Unassigned'
+       ORDER BY field_service_group_name`);
+    const famRes = db.exec(
+      `SELECT DISTINCT family_name FROM persons
+       WHERE family_name IS NOT NULL AND family_name != ''
+       ORDER BY family_name`);
+    const fsgOpts = fsgRes.length ? fsgRes[0].values.map(r => r[0]) : [];
+    const famOpts = famRes.length ? famRes[0].values.map(r => r[0]) : [];
+
+    ['fsgFilterDesktop','fsgFilterMobile'].forEach(id => {
+      const el = document.getElementById(id); if (!el) return;
+      el.innerHTML = '<option value="">All Groups</option>' +
+        fsgOpts.map(v => `<option value="${h(v)}"${v===fsgFilter?' selected':''}>${h(v)}</option>`).join('');
+    });
+    ['familyFilterDesktop','familyFilterMobile'].forEach(id => {
+      const el = document.getElementById(id); if (!el) return;
+      el.innerHTML = '<option value="">All Families</option>' +
+        famOpts.map(v => `<option value="${h(v)}"${v===familyFilter?' selected':''}>${h(v)}</option>`).join('');
+    });
   } catch(e) { console.error(e); }
 }
 
@@ -1389,7 +1446,7 @@ function renderActiveFilters() {
   toggle.textContent = filterMode;
 
   const hasAge     = ageMin !== null || ageMax !== null;
-  const totalCount = activeFilters.length + (hasAge ? 1 : 0);
+  const totalCount = activeFilters.length + (hasAge ? 1 : 0) + (fsgFilter ? 1 : 0) + (familyFilter ? 1 : 0);
 
   if (!totalCount) {
     bar.classList.add('hidden');
@@ -1445,7 +1502,35 @@ function renderActiveFilters() {
       </span>`;
   }).join('');
 
-  chips.innerHTML = ageChip + tagChips;
+  let fsgChip = '';
+  if (fsgFilter) {
+    fsgChip = `
+      <span class="inline-flex items-center gap-0 rounded-full text-xs font-medium overflow-hidden
+                   bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+        <span class="pl-2 pr-1.5 py-0.5 border-r border-black/10 dark:border-white/10 font-semibold">FSG</span>
+        <span class="px-1.5 py-0.5">${h(fsgFilter)}</span>
+        <button onclick="clearFsgFilter()" title="Remove FSG filter"
+                class="pl-0.5 pr-1.5 py-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+          ${xIcon}
+        </button>
+      </span>`;
+  }
+
+  let familyChip = '';
+  if (familyFilter) {
+    familyChip = `
+      <span class="inline-flex items-center gap-0 rounded-full text-xs font-medium overflow-hidden
+                   bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+        <span class="pl-2 pr-1.5 py-0.5 border-r border-black/10 dark:border-white/10 font-semibold">FH</span>
+        <span class="px-1.5 py-0.5">${h(familyFilter)}</span>
+        <button onclick="clearFamilyFilter()" title="Remove family filter"
+                class="pl-0.5 pr-1.5 py-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+          ${xIcon}
+        </button>
+      </span>`;
+  }
+
+  chips.innerHTML = ageChip + fsgChip + familyChip + tagChips;
 }
 
 /* ─────────────────────────────────────────
@@ -1489,6 +1574,24 @@ function clearAgeFilter() {
   ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
+  });
+  renderActiveFilters();
+  renderResults();
+}
+
+function clearFsgFilter() {
+  fsgFilter = null;
+  ['fsgFilterDesktop','fsgFilterMobile'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderActiveFilters();
+  renderResults();
+}
+
+function clearFamilyFilter() {
+  familyFilter = null;
+  ['familyFilterDesktop','familyFilterMobile'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
   });
   renderActiveFilters();
   renderResults();
@@ -1634,6 +1737,7 @@ async function fetchCSVFromURL(statusElId) {
     saveSettings();
 
     loadAvailTags();
+    loadSelectOptions();
     applyDefaultFilters();
     renderActiveFilters();
     renderResults();
@@ -1730,7 +1834,9 @@ async function clearDb() {
   activeFilters = [];
   availTags = {};
   ageMin = ageMax = null;
-  ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
+  fsgFilter = familyFilter = null;
+  ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile',
+   'fsgFilterDesktop','fsgFilterMobile','familyFilterDesktop','familyFilterMobile'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   await idbDelete(DB_KEY);
@@ -1769,6 +1875,7 @@ async function init() {
   const loaded = await loadDbFromStorage();
   if (loaded) {
     loadAvailTags();
+    loadSelectOptions();
     applyDefaultFilters();
     renderActiveFilters();
     renderTagPanel('tagPanelDesktop');
@@ -1808,6 +1915,21 @@ async function init() {
   wireAgeInput('ageMinMobile',  'ageMinDesktop', true);
   wireAgeInput('ageMaxMobile',  'ageMaxDesktop', false);
 
+  // Dropdown filters (sync desktop ↔ mobile)
+  function wireSelectFilter(ownId, mirrorId, setter) {
+    document.getElementById(ownId).addEventListener('change', e => {
+      setter(e.target.value || null);
+      const mirror = document.getElementById(mirrorId);
+      if (mirror) mirror.value = e.target.value;
+      renderActiveFilters();
+      renderResults();
+    });
+  }
+  wireSelectFilter('fsgFilterDesktop',    'fsgFilterMobile',    v => fsgFilter = v);
+  wireSelectFilter('fsgFilterMobile',     'fsgFilterDesktop',   v => fsgFilter = v);
+  wireSelectFilter('familyFilterDesktop', 'familyFilterMobile', v => familyFilter = v);
+  wireSelectFilter('familyFilterMobile',  'familyFilterDesktop',v => familyFilter = v);
+
   // Filter toggle (mobile)
   document.getElementById('filterToggleBtn').addEventListener('click', () => {
     const sheet = document.getElementById('filterSheet');
@@ -1836,7 +1958,9 @@ async function init() {
   function clearAllFilters() {
     activeFilters = [];
     ageMin = ageMax = null;
-    ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
+    fsgFilter = familyFilter = null;
+    ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile',
+     'fsgFilterDesktop','fsgFilterMobile','familyFilterDesktop','familyFilterMobile'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     renderActiveFilters();
@@ -1906,6 +2030,7 @@ async function init() {
       settings.lastSync = new Date().toISOString();
       saveSettings();
       loadAvailTags();
+      loadSelectOptions();
       applyDefaultFilters();
       renderActiveFilters();
       renderResults();
@@ -1935,6 +2060,8 @@ window.clearAgeFilter    = clearAgeFilter;
 window.downloadVCard     = downloadVCard;
 window.downloadAllVCards = downloadAllVCards;
 window.openPersonDetail  = openPersonDetail;
+window.clearFsgFilter    = clearFsgFilter;
+window.clearFamilyFilter = clearFamilyFilter;
 
 init().catch(console.error);
 </script>
