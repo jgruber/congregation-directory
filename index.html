@@ -1013,9 +1013,11 @@ async function importCSVText(csvText) {
       tags.push({ person_id: pid, type:'congregation', name:'Associated Family', value:'' });
     }
 
-    // Active / Inactive
-    tags.push({ person_id: pid, type:'congregation',
-      name: inactive ? 'Inactive' : 'Active', value:'' });
+    // Active / Inactive — only applies to publishers (baptized or UBP)
+    if (baptized || privilege === 'UBP') {
+      tags.push({ person_id: pid, type:'congregation',
+        name: inactive ? 'Inactive' : 'Active', value:'' });
+    }
 
     // Moved
     if (isMoved) tags.push({ person_id: pid, type:'congregation', name:'Moved', value:'' });
