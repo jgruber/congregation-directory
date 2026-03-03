@@ -973,6 +973,9 @@ async function importCSVText(csvText) {
     tags.push({ person_id: pid, type:'congregation',
       name: inactive ? 'Inactive' : 'Active', value:'' });
 
+    // Moved
+    if (isMoved) tags.push({ person_id: pid, type:'congregation', name:'Moved', value:'' });
+
     // Pioneer
     if (pioneer)   tags.push({ person_id:pid, type:'appointment', name:'Regular Pioneer',              value:'' });
     if (regAux)    tags.push({ person_id:pid, type:'appointment', name:'Continuous Auxiliary Pioneer', value:'' });
@@ -1631,6 +1634,8 @@ async function fetchCSVFromURL(statusElId) {
     saveSettings();
 
     loadAvailTags();
+    applyDefaultFilters();
+    renderActiveFilters();
     renderResults();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
@@ -1739,6 +1744,11 @@ async function clearDb() {
   toast('Database cleared');
 }
 
+function applyDefaultFilters() {
+  // Default: exclude Moved persons unless user has already set filters
+  activeFilters = [{ id: Date.now(), name: 'Moved', tagType: 'congregation', mode: 'exclude' }];
+}
+
 /* ─────────────────────────────────────────
    INIT
 ───────────────────────────────────────── */
@@ -1759,6 +1769,8 @@ async function init() {
   const loaded = await loadDbFromStorage();
   if (loaded) {
     loadAvailTags();
+    applyDefaultFilters();
+    renderActiveFilters();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
   }
@@ -1894,6 +1906,8 @@ async function init() {
       settings.lastSync = new Date().toISOString();
       saveSettings();
       loadAvailTags();
+      applyDefaultFilters();
+      renderActiveFilters();
       renderResults();
       renderTagPanel('tagPanelDesktop');
       renderTagPanel('tagPanelMobile');
