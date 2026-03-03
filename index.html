@@ -354,11 +354,20 @@
 /* ─────────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────────── */
+const DEBUG       = true;          // set false to silence SQL logging
 const IDB_NAME    = 'congregation_directory';
 const IDB_VERSION = 1;
 const DB_KEY      = 'sqlite_db';
 const SETTINGS_KEY = 'dir_settings';
 const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
+
+function dbLog(label, sql, params) {
+  if (!DEBUG) return;
+  console.groupCollapsed(`[SQL] ${label}`);
+  console.log('SQL:', sql.replace(/\s+/g, ' ').trim());
+  if (params && params.length) console.log('Params:', params);
+  console.groupEnd();
+}
 
 const THEMES = {
   blue:   { label:'Blue',   hex:'#3b82f6' },
@@ -1033,11 +1042,13 @@ function execSearch() {
   if (!db) return [];
   try {
     const { sql, params } = buildQuery();
+    dbLog('execSearch', sql, params);
     const stmt = db.prepare(sql);
     stmt.bind(params);
     const results = [];
     while (stmt.step()) results.push(stmt.getAsObject());
     stmt.free();
+    if (DEBUG) console.log(`[SQL] execSearch → ${results.length} rows`);
     return results;
   } catch(e) {
     console.error('Search error:', e);
@@ -1049,21 +1060,25 @@ function loadAvailTags() {
   availTags = {};
   if (!db) return;
   try {
-    const res = db.exec(
-      `SELECT DISTINCT type, name, COUNT(*) as c FROM tags GROUP BY type, name ORDER BY type, name`
-    );
-    if (!res.length) return;
+    const sql = `SELECT DISTINCT type, name, COUNT(*) as c FROM tags GROUP BY type, name ORDER BY type, name`;
+    dbLog('loadAvailTags', sql, []);
+    const res = db.exec(sql);
+    if (!res.length) { if (DEBUG) console.log('[SQL] loadAvailTags → 0 rows (tags table empty?)'); return; }
     for (const [type, name, count] of res[0].values) {
       if (!availTags[type]) availTags[type] = [];
       availTags[type].push({ name, count });
     }
+    if (DEBUG) console.log('[SQL] loadAvailTags → availTags:', JSON.parse(JSON.stringify(availTags)));
   } catch(e) { console.error(e); }
 }
 
 function getPersonTags(pid) {
   if (!db) return [];
   try {
-    const res = db.exec(`SELECT type, name, value FROM tags WHERE person_id=? ORDER BY type, name`, [pid]);
+    const sql = `SELECT type, name, value FROM tags WHERE person_id=? ORDER BY type, name`;
+    dbLog('getPersonTags', sql, [pid]);
+    const res = db.exec(sql, [pid]);
+    if (DEBUG) console.log(`[SQL] getPersonTags(${pid}) → ${res.length ? res[0].values.length : 0} rows`);
     if (!res.length) return [];
     return res[0].values.map(([type, name, value]) => ({ type, name, value }));
   } catch(e) { return []; }
