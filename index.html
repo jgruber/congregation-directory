@@ -165,14 +165,24 @@
       <div id="resultsHeader" class="hidden sticky top-0 z-10 px-4 py-2 bg-gray-50/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
         <div class="flex items-center justify-between gap-2">
           <p id="resultsCount" class="text-xs text-gray-500 dark:text-gray-400"></p>
-          <button onclick="downloadAllVCards()"
-                  class="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            All vCards
-          </button>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <button onclick="emailAll()"
+                    class="flex items-center gap-1 text-xs text-primary hover:underline">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              All Email
+            </button>
+            <button onclick="downloadAllVCards()"
+                    class="flex items-center gap-1 text-xs text-primary hover:underline">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              All vCards
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1385,6 +1395,12 @@ function downloadAllVCards() {
   triggerDownload(vcf, 'directory.vcf', 'text/vcard');
 }
 
+function emailAll() {
+  const emails = currentPersons.map(p => p.email).filter(Boolean);
+  if (!emails.length) { toast('No email addresses in current results'); return; }
+  window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(','))}`;
+}
+
 function renderTagPanel(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -2059,6 +2075,7 @@ window.removeTagFilter   = removeTagFilter;
 window.clearAgeFilter    = clearAgeFilter;
 window.downloadVCard     = downloadVCard;
 window.downloadAllVCards = downloadAllVCards;
+window.emailAll          = emailAll;
 window.openPersonDetail  = openPersonDetail;
 window.clearFsgFilter    = clearFsgFilter;
 window.clearFamilyFilter = clearFamilyFilter;
