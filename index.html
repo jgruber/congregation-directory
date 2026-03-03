@@ -1033,14 +1033,12 @@ function execSearch() {
   if (!db) return [];
   try {
     const { sql, params } = buildQuery();
-    const res = db.exec(sql, params);
-    if (!res.length) return [];
-    const cols = res[0].columns;
-    return res[0].values.map(row => {
-      const obj = {};
-      cols.forEach((c,i) => obj[c] = row[i]);
-      return obj;
-    });
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const results = [];
+    while (stmt.step()) results.push(stmt.getAsObject());
+    stmt.free();
+    return results;
   } catch(e) {
     console.error('Search error:', e);
     return [];
