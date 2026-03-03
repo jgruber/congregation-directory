@@ -1043,6 +1043,17 @@ function execSearch() {
   try {
     const { sql, params } = buildQuery();
     dbLog('execSearch', sql, params);
+    if (DEBUG && params.length) {
+      for (const p of params) {
+        const safe = String(p).replace(/'/g, "''");
+        const c1 = db.exec(`SELECT COUNT(*) FROM tags WHERE name='${safe}'`);
+        console.log(`[SQL] DEBUG tags WHERE name='${safe}' → count=${c1[0]?.values[0][0]}`);
+        const c2 = db.exec(`SELECT COUNT(*) FROM tags`);
+        console.log(`[SQL] DEBUG total tags rows=${c2[0]?.values[0][0]}`);
+        const c3 = db.exec(`SELECT DISTINCT name FROM tags LIMIT 10`);
+        console.log(`[SQL] DEBUG sample tag names:`, c3[0]?.values.map(r => r[0]));
+      }
+    }
     const stmt = db.prepare(sql);
     stmt.bind(params);
     const results = [];
