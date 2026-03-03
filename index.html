@@ -1214,7 +1214,7 @@ function renderTagPanel(containerId) {
       return `<button
         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                font-medium border transition-all ${cls}"
-        onclick="toggleTagFilter(${JSON.stringify(tag.name)},${JSON.stringify(type)})"
+        onclick="toggleTagFilter(${h(JSON.stringify(tag.name))},${h(JSON.stringify(type))})"
         title="${h(tag.name)} (${tag.count} persons)">
         ${pre}${h(tag.name)}<span class="opacity-50 text-[10px]">${tag.count}</span>
       </button>`;
@@ -1263,7 +1263,7 @@ function renderActiveFilters() {
     return `
       <span class="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium ${cls}">
         ${prefix}${h(f.name)}
-        <button onclick="toggleTagFilter(${JSON.stringify(f.name)},${JSON.stringify(f.tagType)})"
+        <button onclick="toggleTagFilter(${h(JSON.stringify(f.name))},${h(JSON.stringify(f.tagType))})"
                 class="ml-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5">
           <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
