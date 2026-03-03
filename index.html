@@ -987,22 +987,19 @@ async function importCSVText(csvText) {
     // Family
     if (familyName) tags.push({ person_id: pid, type:'family', name:'Family', value: familyName });
 
-    // Privilege
-    if (privilege === 'E') {
-      tags.push({ person_id: pid, type:'appointment',  name:'Elder',              value:'' });
-      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
-      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
-    } else if (privilege === 'MS') {
-      tags.push({ person_id: pid, type:'appointment',  name:'Ministerial Servant',value:'' });
-      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
-      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
-    } else if (privilege === 'PUB') {
-      tags.push({ person_id: pid, type:'congregation', name:'Publisher',          value:'' });
-      tags.push({ person_id: pid, type:'congregation', name:'Baptized',           value:'' });
+    // Privilege — appointment tags
+    if (privilege === 'E')  tags.push({ person_id: pid, type:'appointment', name:'Elder',               value:'' });
+    if (privilege === 'MS') tags.push({ person_id: pid, type:'appointment', name:'Ministerial Servant',  value:'' });
+
+    // Congregation standing — Baptized always implies Publisher
+    if (baptized) {
+      tags.push({ person_id: pid, type:'congregation', name:'Publisher', value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Baptized',  value:'' });
     } else if (privilege === 'UBP') {
-      tags.push({ person_id: pid, type:'congregation', name:'Unbaptized Publisher',value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Unbaptized Publisher', value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Publisher',            value:'' });
     } else if (privilege === 'No') {
-      tags.push({ person_id: pid, type:'congregation', name:'Associated Family',  value:'' });
+      tags.push({ person_id: pid, type:'congregation', name:'Associated Family', value:'' });
     }
 
     // Active / Inactive
