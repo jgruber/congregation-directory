@@ -1043,6 +1043,18 @@ function execSearch() {
   try {
     const { sql, params } = buildQuery();
     dbLog('execSearch', sql, []);
+    if (DEBUG) {
+      const r1 = db.exec(`SELECT person_id FROM tags WHERE name='Family Head' LIMIT 5`);
+      console.log('[SQL] DEBUG sample person_ids in tags for Family Head:', r1[0]?.values.map(r=>r[0]));
+      const r2 = db.exec(`SELECT id FROM persons LIMIT 5`);
+      console.log('[SQL] DEBUG sample ids in persons:', r2[0]?.values.map(r=>r[0]));
+      const r3 = db.exec(`SELECT COUNT(*) FROM persons p WHERE p.id IN (SELECT person_id FROM tags WHERE name='Family Head')`);
+      console.log('[SQL] DEBUG direct IN subquery count:', r3[0]?.values[0][0]);
+      const r4 = db.exec(`SELECT typeof(id) FROM persons LIMIT 1`);
+      console.log('[SQL] DEBUG typeof persons.id:', r4[0]?.values[0][0]);
+      const r5 = db.exec(`SELECT typeof(person_id) FROM tags LIMIT 1`);
+      console.log('[SQL] DEBUG typeof tags.person_id:', r5[0]?.values[0][0]);
+    }
     const res = db.exec(sql);
     const results = res.length
       ? res[0].values.map(row => { const o = {}; res[0].columns.forEach((c,i) => o[c] = row[i]); return o; })
