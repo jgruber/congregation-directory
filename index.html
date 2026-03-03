@@ -118,6 +118,16 @@
       class="hidden md:flex flex-col w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800
              bg-white dark:bg-gray-900 overflow-y-auto">
       <div class="p-4 flex-1">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Age Range</p>
+        <div class="flex items-center gap-2 mb-4">
+          <input type="number" id="ageMinDesktop" min="0" max="120" placeholder="Min"
+            class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]" />
+          <span class="text-xs text-gray-400 flex-shrink-0">–</span>
+          <input type="number" id="ageMaxDesktop" min="0" max="120" placeholder="Max"
+            class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]" />
+        </div>
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Filter by Tags</p>
         <div id="tagPanelDesktop" class="space-y-3"></div>
       </div>
@@ -177,6 +187,17 @@
       </button>
     </div>
     <div class="overflow-y-auto p-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Age Range</p>
+      <div class="flex items-center gap-2 mb-4">
+        <input type="number" id="ageMinMobile" min="0" max="120" placeholder="Min"
+          class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                 bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]" />
+        <span class="text-xs text-gray-400 flex-shrink-0">–</span>
+        <input type="number" id="ageMaxMobile" min="0" max="120" placeholder="Max"
+          class="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700
+                 bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]" />
+      </div>
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Filter by Tags</p>
       <div id="tagPanelMobile" class="space-y-3"></div>
     </div>
   </div>
@@ -424,6 +445,8 @@ let db           = null;     // sql.js Database
 let availTags    = {};       // { type: [{name, count}] }
 let activeFilters = [];      // [{id, name, tagType, mode:'include'|'exclude'}]
 let filterMode   = 'AND';
+let ageMin       = null;     // minimum age filter (integer or null)
+let ageMax       = null;     // maximum age filter (integer or null)
 let searchText   = '';
 let autoSyncTimer = null;
 
@@ -1032,6 +1055,13 @@ function buildQuery() {
     }
   }
 
+  if (ageMin !== null || ageMax !== null) {
+    const ageExpr = `CAST((julianday('now') - julianday(replace(p.date_of_birth,'/','-'))) / 365.25 AS INTEGER)`;
+    where.push(`p.date_of_birth > '1900/01/01'`);
+    if (ageMin !== null) where.push(`${ageExpr} >= ${parseInt(ageMin)}`);
+    if (ageMax !== null) where.push(`${ageExpr} <= ${parseInt(ageMax)}`);
+  }
+
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   return {
     sql: `SELECT DISTINCT p.id, p.first_name, p.last_name, p.display_name,
@@ -1243,12 +1273,13 @@ function renderTagPanel(containerId) {
             ? 'chip-include border-[var(--p)]'
             : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-700')
         : `${tagBadge(type)} border-transparent hover:border-current`;
-      const pre = af?.mode === 'exclude' ? '✕ ' : '';
+      const pre = af?.mode === 'include' ? '✓ ' : af?.mode === 'exclude' ? '¬ ' : '';
+      const tipAction = af ? 'Remove filter' : 'Add filter';
       return `<button
         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                font-medium border transition-all ${cls}"
         onclick="toggleTagFilter(${h(JSON.stringify(tag.name))},${h(JSON.stringify(type))})"
-        title="${h(tag.name)} (${tag.count} persons)">
+        title="${tipAction}: ${h(tag.name)} (${tag.count} persons)">
         ${pre}${h(tag.name)}<span class="opacity-50 text-[10px]">${tag.count}</span>
       </button>`;
     }).join('');
@@ -1278,7 +1309,10 @@ function renderActiveFilters() {
 
   toggle.textContent = filterMode;
 
-  if (!activeFilters.length) {
+  const hasAge     = ageMin !== null || ageMax !== null;
+  const totalCount = activeFilters.length + (hasAge ? 1 : 0);
+
+  if (!totalCount) {
     bar.classList.add('hidden');
     badge.classList.add('hidden');
     return;
@@ -1286,41 +1320,98 @@ function renderActiveFilters() {
 
   bar.classList.remove('hidden');
   badge.classList.remove('hidden');
-  badge.textContent = activeFilters.length;
+  badge.textContent = totalCount;
 
-  chips.innerHTML = activeFilters.map(f => {
-    const cls = f.mode === 'include'
+  const xIcon = `<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+  let ageChip = '';
+  if (hasAge) {
+    const label = ageMin !== null && ageMax !== null
+      ? `${ageMin}–${ageMax}`
+      : ageMin !== null ? `${ageMin}+` : `≤${ageMax}`;
+    ageChip = `
+      <span class="inline-flex items-center gap-0 rounded-full text-xs font-medium overflow-hidden
+                   bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+        <span class="pl-2 pr-1.5 py-0.5 border-r border-black/10 dark:border-white/10 font-semibold">Age</span>
+        <span class="px-1.5 py-0.5">${h(label)}</span>
+        <button onclick="clearAgeFilter()" title="Remove age filter"
+                class="pl-0.5 pr-1.5 py-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+          ${xIcon}
+        </button>
+      </span>`;
+  }
+
+  const tagChips = activeFilters.map(f => {
+    const isInclude = f.mode === 'include';
+    const cls = isInclude
       ? 'chip-include'
       : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-    const prefix = f.mode === 'exclude' ? '✕ NOT ' : '';
+    const modeIcon  = isInclude ? '✓' : '¬';
+    const modeTitle = isInclude ? 'Click to exclude' : 'Click to include';
     return `
-      <span class="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium ${cls}">
-        ${prefix}${h(f.name)}
-        <button onclick="toggleTagFilter(${h(JSON.stringify(f.name))},${h(JSON.stringify(f.tagType))})"
-                class="ml-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5">
-          <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+      <span class="inline-flex items-center gap-0 rounded-full text-xs font-medium overflow-hidden ${cls}">
+        <button onclick="negateTagFilter(${h(JSON.stringify(f.name))},${h(JSON.stringify(f.tagType))})"
+                title="${modeTitle}"
+                class="pl-2 pr-1 py-0.5 border-r border-black/10 dark:border-white/10
+                       hover:bg-black/10 dark:hover:bg-white/10 transition-colors font-mono">
+          ${modeIcon}
+        </button>
+        <span class="px-1.5 py-0.5">${h(f.name)}</span>
+        <button onclick="removeTagFilter(${h(JSON.stringify(f.name))},${h(JSON.stringify(f.tagType))})"
+                title="Remove filter"
+                class="pl-0.5 pr-1.5 py-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+          ${xIcon}
         </button>
       </span>`;
   }).join('');
+
+  chips.innerHTML = ageChip + tagChips;
 }
 
 /* ─────────────────────────────────────────
    INTERACTIONS
 ───────────────────────────────────────── */
 function toggleTagFilter(tagName, tagType) {
+  // In the tag panel: first click = include, second click = remove (skip exclude)
   const idx = activeFilters.findIndex(f => f.name === tagName && f.tagType === tagType);
   if (idx === -1) {
     activeFilters.push({ id: Date.now(), name: tagName, tagType, mode: 'include' });
-  } else if (activeFilters[idx].mode === 'include') {
-    activeFilters[idx].mode = 'exclude';
   } else {
     activeFilters.splice(idx, 1);
   }
   renderActiveFilters();
   renderTagPanel('tagPanelDesktop');
   renderTagPanel('tagPanelMobile');
+  renderResults();
+}
+
+function negateTagFilter(tagName, tagType) {
+  const f = activeFilters.find(f => f.name === tagName && f.tagType === tagType);
+  if (!f) return;
+  f.mode = f.mode === 'include' ? 'exclude' : 'include';
+  renderActiveFilters();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderResults();
+}
+
+function removeTagFilter(tagName, tagType) {
+  const idx = activeFilters.findIndex(f => f.name === tagName && f.tagType === tagType);
+  if (idx !== -1) activeFilters.splice(idx, 1);
+  renderActiveFilters();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderResults();
+}
+
+function clearAgeFilter() {
+  ageMin = ageMax = null;
+  ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderActiveFilters();
   renderResults();
 }
 
@@ -1557,6 +1648,10 @@ async function clearDb() {
   if (db) { db.close(); db = null; }
   activeFilters = [];
   availTags = {};
+  ageMin = ageMax = null;
+  ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
   await idbDelete(DB_KEY);
   settings.lastSync = null;
   saveSettings();
@@ -1609,6 +1704,22 @@ async function init() {
     renderResults();
   });
 
+  // Age range filter (syncs desktop ↔ mobile inputs)
+  function wireAgeInput(ownId, mirrorId, isMin) {
+    document.getElementById(ownId).addEventListener('input', e => {
+      const val = e.target.value !== '' ? parseInt(e.target.value) : null;
+      if (isMin) ageMin = val; else ageMax = val;
+      const mirror = document.getElementById(mirrorId);
+      if (mirror) mirror.value = e.target.value;
+      renderActiveFilters();
+      renderResults();
+    });
+  }
+  wireAgeInput('ageMinDesktop', 'ageMinMobile', true);
+  wireAgeInput('ageMaxDesktop', 'ageMaxMobile', false);
+  wireAgeInput('ageMinMobile',  'ageMinDesktop', true);
+  wireAgeInput('ageMaxMobile',  'ageMaxDesktop', false);
+
   // Filter toggle (mobile)
   document.getElementById('filterToggleBtn').addEventListener('click', () => {
     const sheet = document.getElementById('filterSheet');
@@ -1636,6 +1747,10 @@ async function init() {
   // Clear filters
   function clearAllFilters() {
     activeFilters = [];
+    ageMin = ageMax = null;
+    ['ageMinDesktop','ageMaxDesktop','ageMinMobile','ageMaxMobile'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
     renderActiveFilters();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
@@ -1724,6 +1839,9 @@ async function init() {
 
 // Expose globally for inline onclick handlers
 window.toggleTagFilter   = toggleTagFilter;
+window.negateTagFilter   = negateTagFilter;
+window.removeTagFilter   = removeTagFilter;
+window.clearAgeFilter    = clearAgeFilter;
 window.openPersonDetail  = openPersonDetail;
 
 init().catch(console.error);
