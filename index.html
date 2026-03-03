@@ -1288,6 +1288,17 @@ function renderResults() {
   grid.innerHTML = persons.map(renderCard).join('');
 }
 
+function calcAge(dob) {
+  if (!dob || dob <= '1900/01/01') return null;
+  const d = new Date(dob.replace(/\//g, '-'));
+  if (isNaN(d)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+
 function renderCard(p) {
   const av    = avatarColor(p.last_name || p.display_name || '');
   const ini   = initials(p.first_name, p.last_name);
@@ -1300,6 +1311,20 @@ function renderCard(p) {
                   ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
                        <span class="font-medium text-gray-600 dark:text-gray-300">FH:</span> ${h(p.family_name)}
                      </div>` : '';
+
+  const genderColor = p.gender === 'Male' ? 'text-blue-400' : p.gender === 'Female' ? 'text-pink-400' : '';
+  const genderIcon  = p.gender === 'Male' || p.gender === 'Female'
+    ? `<svg class="w-3 h-3 ${genderColor} flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+           d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+       </svg>` : '';
+  const age         = calcAge(p.date_of_birth);
+  const ageParts    = [];
+  if (genderIcon) ageParts.push(genderIcon);
+  if (age !== null) ageParts.push(`<span>${age} yrs</span>`);
+  const genderAge = ageParts.length
+    ? `<div class="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 mt-0.5">${ageParts.join('<span class="opacity-40">·</span>')}</div>`
+    : '';
   const phone = p.mobile
     ? `<a href="tel:${h(p.mobile)}" class="text-xs text-primary mt-1.5 block truncate" onclick="event.stopPropagation()">📞 ${h(p.mobile)}</a>`
     : '';
@@ -1327,6 +1352,7 @@ function renderCard(p) {
                     flex items-center justify-center text-white font-bold text-sm">${ini}</div>
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-sm truncate">${name}</div>
+          ${genderAge}
           ${fsg}${fam}
         </div>
         <button onclick="event.stopPropagation();downloadVCard(${p.id})"
