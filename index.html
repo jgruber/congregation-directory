@@ -728,6 +728,15 @@ async function importCSVText(csvText) {
   const rows = parseCSV(csvText);
   if (!rows.length) throw new Error('No data rows found');
 
+  if (DEBUG) {
+    const firstRow = rows[0];
+    const keys = Object.keys(firstRow);
+    console.log('[IMPORT] DEBUG first row keys (first 5):', keys.slice(0, 5));
+    console.log('[IMPORT] DEBUG row["PersonID"] =', JSON.stringify(firstRow['PersonID']));
+    console.log('[IMPORT] DEBUG parseInt =', parseInt(firstRow['PersonID']));
+    console.log('[IMPORT] DEBUG key[0] charCodes:', [...(keys[0]||'')].map(c=>c.charCodeAt(0)));
+  }
+
   const tags        = [];
   const families    = {};
   const fsGroups    = {};
