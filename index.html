@@ -151,7 +151,17 @@
 
       <!-- Results header -->
       <div id="resultsHeader" class="hidden sticky top-0 z-10 px-4 py-2 bg-gray-50/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-        <p id="resultsCount" class="text-xs text-gray-500 dark:text-gray-400"></p>
+        <div class="flex items-center justify-between gap-2">
+          <p id="resultsCount" class="text-xs text-gray-500 dark:text-gray-400"></p>
+          <button onclick="downloadAllVCards()"
+                  class="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            All vCards
+          </button>
+        </div>
       </div>
 
       <!-- Cards grid -->
@@ -443,6 +453,7 @@ const AVATAR_COLORS = [
 let SQL          = null;     // sql.js module
 let db           = null;     // sql.js Database
 let availTags    = {};       // { type: [{name, count}] }
+let currentPersons = [];     // last execSearch() result, for vCard exports
 let activeFilters = [];      // [{id, name, tagType, mode:'include'|'exclude'}]
 let filterMode   = 'AND';
 let ageMin       = null;     // minimum age filter (integer or null)
@@ -1067,6 +1078,7 @@ function buildQuery() {
     sql: `SELECT DISTINCT p.id, p.first_name, p.last_name, p.display_name,
             p.mobile, p.email, p.field_service_group_name, p.family_name,
             p.gender, p.category, p.full_address,
+            p.address, p.city, p.state, p.postal_code,
             p.elder, p.ministerial_servant, p.pioneer, p.regular_auxiliary,
             p.special_pioneer, p.inactive, p.moved, p.removed, p.child,
             p.date_of_birth, p.date_of_baptism
@@ -1173,7 +1185,7 @@ function tagBadge(type) {
    RENDER
 ───────────────────────────────────────── */
 function renderResults() {
-  const persons   = execSearch();
+  const persons   = currentPersons = execSearch();
   const grid      = document.getElementById('resultsGrid');
   const empty     = document.getElementById('emptyState');
   const noRes     = document.getElementById('noResults');
@@ -1211,10 +1223,18 @@ function renderCard(p) {
   const ini   = initials(p.first_name, p.last_name);
   const name  = h(p.display_name || `${p.first_name} ${p.last_name}`);
   const fsg   = p.field_service_group_name && p.field_service_group_name !== 'Unassigned'
-                  ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">${h(p.field_service_group_name)}</div>` : '';
-  const fam   = p.family_name ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">${h(p.family_name)}</div>` : '';
+                  ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                       <span class="font-medium text-gray-600 dark:text-gray-300">FSG:</span> ${h(p.field_service_group_name)}
+                     </div>` : '';
+  const fam   = p.family_name
+                  ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                       <span class="font-medium text-gray-600 dark:text-gray-300">FH:</span> ${h(p.family_name)}
+                     </div>` : '';
   const phone = p.mobile
     ? `<a href="tel:${h(p.mobile)}" class="text-xs text-primary mt-1.5 block truncate" onclick="event.stopPropagation()">📞 ${h(p.mobile)}</a>`
+    : '';
+  const email = p.email
+    ? `<a href="mailto:${h(p.email)}" class="text-xs text-primary mt-1 block truncate" onclick="event.stopPropagation()">✉️ ${h(p.email)}</a>`
     : '';
 
   let badges = '';
@@ -1239,14 +1259,70 @@ function renderCard(p) {
           <div class="font-semibold text-sm truncate">${name}</div>
           ${fsg}${fam}
         </div>
+        <button onclick="event.stopPropagation();downloadVCard(${p.id})"
+                title="Download vCard"
+                class="flex-shrink-0 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
+                       text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+        </button>
       </div>
       ${badges ? `<div class="flex flex-wrap gap-1 mt-2">${badges}</div>` : ''}
-      ${phone}
+      ${phone}${email}
     </div>`;
 }
 
 function badgePill(type, label) {
   return `<span class="inline-flex px-1.5 py-0.5 rounded text-xs ${tagBadge(type)}">${h(label)}</span>`;
+}
+
+/* ─────────────────────────────────────────
+   VCARD EXPORT
+───────────────────────────────────────── */
+function makeVCard(p) {
+  const e = v => (v || '').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
+  lines.push(`FN:${e(p.display_name || `${p.first_name || ''} ${p.last_name || ''}`.trim())}`);
+  lines.push(`N:${e(p.last_name)};${e(p.first_name)};;;`);
+  if (p.mobile) lines.push(`TEL;TYPE=CELL:${e(p.mobile)}`);
+  if (p.email)  lines.push(`EMAIL;TYPE=HOME:${e(p.email)}`);
+  if (p.address || p.city) {
+    lines.push(`ADR;TYPE=HOME:;;${e(p.address)};${e(p.city)};${e(p.state)};${e(p.postal_code)};`);
+  } else if (p.full_address && p.full_address.trim()) {
+    lines.push(`ADR;TYPE=HOME:;;${e(p.full_address)};;;;`);
+  }
+  if (p.field_service_group_name && p.field_service_group_name !== 'Unassigned')
+    lines.push(`ORG:${e(p.field_service_group_name)}`);
+  const title = p.elder ? 'Elder'
+    : p.ministerial_servant ? 'Ministerial Servant'
+    : p.special_pioneer ? 'Special Pioneer'
+    : p.pioneer ? 'Regular Pioneer' : '';
+  if (title) lines.push(`TITLE:${title}`);
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+
+function triggerDownload(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadVCard(id) {
+  const p = currentPersons.find(x => x.id == id);
+  if (!p) return;
+  const safe = (p.last_name || p.display_name || 'contact').replace(/[^a-z0-9]/gi, '_');
+  triggerDownload(makeVCard(p), `${safe}.vcf`, 'text/vcard');
+}
+
+function downloadAllVCards() {
+  if (!currentPersons.length) return;
+  const vcf = currentPersons.map(makeVCard).join('\r\n');
+  triggerDownload(vcf, 'directory.vcf', 'text/vcard');
 }
 
 function renderTagPanel(containerId) {
@@ -1842,6 +1918,8 @@ window.toggleTagFilter   = toggleTagFilter;
 window.negateTagFilter   = negateTagFilter;
 window.removeTagFilter   = removeTagFilter;
 window.clearAgeFilter    = clearAgeFilter;
+window.downloadVCard     = downloadVCard;
+window.downloadAllVCards = downloadAllVCards;
 window.openPersonDetail  = openPersonDetail;
 
 init().catch(console.error);
