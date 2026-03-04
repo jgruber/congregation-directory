@@ -2118,6 +2118,7 @@ async function fetchCSVFromURL(statusElId) {
     renderResults();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
+    renderCustomTagList();
     updateDbStats();
 
     const tagMsg = tagsImported ? `, ${tagsImported} tag(s)` : '';
