@@ -1,4 +1,4 @@
-const CACHE = 'cong-dir-v1';
+const CACHE = 'cong-dir-v2';
 
 // App shell files to pre-cache on install
 const APP_SHELL = [
