@@ -1,8 +1,7 @@
-const CACHE = 'cong-dir-v2';
+const CACHE = 'cong-dir-v3';
 
-// App shell files to pre-cache on install
+// Static assets to pre-cache (not index.html — that uses network-first)
 const APP_SHELL = [
-  './',
   './favicon.svg',
   './favicon.ico',
   './favicon-16x16.png',
@@ -35,7 +34,20 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for same-origin assets; cache CDN resources on first load
+  // Network-first for HTML navigation requests — always get the latest app
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE).then(c => c.put(e.request, response.clone()));
+        }
+        return response;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets and CDN resources
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
