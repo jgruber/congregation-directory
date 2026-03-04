@@ -1973,34 +1973,48 @@ async function deleteCustomTag(idx) {
   toast(`Tag "${t.name}" deleted`);
 }
 
+// Merges a single parsed tag object into localStorage.
+// autoReplace=true skips the confirm dialog and always replaces existing entries.
+// Returns false if the user cancelled, true otherwise. Throws on invalid data.
+function applyTagData(data, autoReplace = false) {
+  if (data.version !== 1 || typeof data.tagName !== 'string' || !Array.isArray(data.assignments)) {
+    throw new Error('Invalid tag file format');
+  }
+  const tags = loadCustomTags();
+  const newAssignments = data.assignments.filter(a => typeof a.personId === 'number');
+  let entry = tags.find(t => t.name === data.tagName);
+  if (entry) {
+    if (!autoReplace) {
+      if (!confirm(`A custom tag named "${data.tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${newAssignments.length} assignment(s) from the imported file. Continue?`)) {
+        return false;
+      }
+    }
+    entry.assignments = newAssignments;
+  } else {
+    tags.push({ name: data.tagName, assignments: newAssignments });
+  }
+  saveCustomTags(tags);
+  return true;
+}
+
 async function importCustomTagFile(file) {
   const statusEl = document.getElementById('customTagImportStatus');
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    if (data.version !== 1 || typeof data.tagName !== 'string' || !Array.isArray(data.assignments)) {
-      throw new Error('Invalid tag file format');
+    const applied = applyTagData(data, false);
+    if (!applied) {
+      if (statusEl) statusEl.textContent = 'Import cancelled.';
+      return;
     }
-    const tags = loadCustomTags();
-    const newAssignments = data.assignments.filter(a => typeof a.personId === 'number');
-    let entry = tags.find(t => t.name === data.tagName);
-    if (entry) {
-      if (!confirm(`A custom tag named "${data.tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${newAssignments.length} assignment(s) from the imported file. Continue?`)) {
-        if (statusEl) statusEl.textContent = 'Import cancelled.';
-        return;
-      }
-      entry.assignments = newAssignments;
-    } else {
-      tags.push({ name: data.tagName, assignments: newAssignments });
-    }
-    saveCustomTags(tags);
+    const count = data.assignments.filter(a => typeof a.personId === 'number').length;
     applyCustomTags();
     await persistDb();
     loadAvailTags();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
     renderCustomTagList();
-    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${newAssignments.length} assignments)`;
+    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${count} assignments)`;
     toast(`Imported tag "${data.tagName}"`);
   } catch(e) {
     if (statusEl) statusEl.textContent = `✗ ${e.message}`;
@@ -2074,6 +2088,29 @@ async function fetchCSVFromURL(statusElId) {
     settings.csvPassword = pass;
     saveSettings();
 
+    // Fetch custom tags from the same URL with ?tags appended
+    let tagsImported = 0;
+    try {
+      if (statusEl) statusEl.textContent = '⏳ Fetching tags…';
+      const tagsUrl = url + (url.includes('?') ? '&' : '?') + 'tags';
+      const tagsRes = await fetch(tagsUrl, { headers });
+      if (tagsRes.ok) {
+        const tagList = await tagsRes.json();
+        if (Array.isArray(tagList)) {
+          for (const tagData of tagList) {
+            try { if (applyTagData(tagData, true)) tagsImported++; }
+            catch(e) { console.warn('[Tags] Skipping invalid tag:', e.message); }
+          }
+          if (tagsImported) {
+            applyCustomTags();
+            await persistDb();
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[Tags] Tags fetch skipped:', e.message);
+    }
+
     loadAvailTags();
     loadSelectOptions();
     applyDefaultFilters();
@@ -2083,8 +2120,9 @@ async function fetchCSVFromURL(statusElId) {
     renderTagPanel('tagPanelMobile');
     updateDbStats();
 
-    if (statusEl) statusEl.textContent = `✓ Imported ${count} persons`;
-    toast(`Imported ${count} persons from URL`);
+    const tagMsg = tagsImported ? `, ${tagsImported} tag(s)` : '';
+    if (statusEl) statusEl.textContent = `✓ Imported ${count} persons${tagMsg}`;
+    toast(`Imported ${count} persons${tagMsg} from URL`);
   } catch(e) {
     const msg = `Error: ${e.message}`;
     if (statusEl) statusEl.textContent = msg;
