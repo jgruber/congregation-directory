@@ -1294,12 +1294,20 @@ function loadSelectOptions() {
        WHERE field_service_group_name IS NOT NULL AND field_service_group_name != ''
          AND field_service_group_name != 'Unassigned'
        ORDER BY field_service_group_name`);
+
+    const famWhere = fsgFilter
+      ? `AND field_service_group_name = '${fsgFilter.replace(/'/g, "''")}'`
+      : '';
     const famRes = db.exec(
       `SELECT DISTINCT family_name FROM persons
-       WHERE family_name IS NOT NULL AND family_name != ''
+       WHERE family_name IS NOT NULL AND family_name != '' ${famWhere}
        ORDER BY family_name`);
+
     const fsgOpts = fsgRes.length ? fsgRes[0].values.map(r => r[0]) : [];
     const famOpts = famRes.length ? famRes[0].values.map(r => r[0]) : [];
+
+    // Clear familyFilter if it no longer appears in the filtered list
+    if (familyFilter && !famOpts.includes(familyFilter)) familyFilter = null;
 
     ['fsgFilterDesktop','fsgFilterMobile'].forEach(id => {
       const el = document.getElementById(id); if (!el) return;
@@ -2304,8 +2312,8 @@ async function init() {
       renderResults();
     });
   }
-  wireSelectFilter('fsgFilterDesktop',    'fsgFilterMobile',    v => fsgFilter = v);
-  wireSelectFilter('fsgFilterMobile',     'fsgFilterDesktop',   v => fsgFilter = v);
+  wireSelectFilter('fsgFilterDesktop',    'fsgFilterMobile',    v => { fsgFilter = v; loadSelectOptions(); });
+  wireSelectFilter('fsgFilterMobile',     'fsgFilterDesktop',   v => { fsgFilter = v; loadSelectOptions(); });
   wireSelectFilter('familyFilterDesktop', 'familyFilterMobile', v => familyFilter = v);
   wireSelectFilter('familyFilterMobile',  'familyFilterDesktop',v => familyFilter = v);
 
