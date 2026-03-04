@@ -187,21 +187,21 @@
         <div class="flex items-center justify-between gap-2">
           <p id="resultsCount" class="text-xs text-gray-500 dark:text-gray-400"></p>
           <div class="flex items-center gap-3 flex-shrink-0">
-            <button onclick="emailAll()"
+            <button onclick="emailAll()" title="Email all"
                     class="flex items-center gap-1 text-xs text-primary hover:underline">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
-              All Email
+              <span class="hidden sm:inline">All Email</span>
             </button>
-            <button onclick="downloadAllVCards()"
+            <button onclick="downloadAllVCards()" title="Download all vCards"
                     class="flex items-center gap-1 text-xs text-primary hover:underline">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
               </svg>
-              All vCards
+              <span class="hidden sm:inline">All vCards</span>
             </button>
             <button id="editModeToggleBtn"
               title="Edit mode: assign custom tags"
