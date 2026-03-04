@@ -49,6 +49,16 @@
     .person-card { transition: box-shadow .15s, transform .15s; }
     .person-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.12); transform: translateY(-1px); }
     .dark .person-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+
+    /* Edit mode selected cards */
+    .person-card.selected {
+      outline: 3px solid var(--p);
+      outline-offset: -2px;
+      background-color: var(--pl);
+    }
+    .dark .person-card.selected {
+      background-color: color-mix(in srgb, var(--p) 15%, transparent);
+    }
   </style>
   <script>
     tailwind.config = {
@@ -192,6 +202,16 @@
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
               </svg>
               All vCards
+            </button>
+            <button id="editModeToggleBtn"
+              title="Edit mode: assign custom tags"
+              class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400
+                     hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+              Edit
             </button>
           </div>
         </div>
@@ -379,6 +399,21 @@
         </div>
       </section>
 
+      <!-- ── Custom Tags ── -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Custom Tags</h3>
+        <div id="customTagList" class="space-y-2 mb-4"></div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <label class="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer
+                        bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200
+                        hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+            Import Tag File
+            <input type="file" id="customTagImportInput" accept=".json" class="hidden"/>
+          </label>
+          <span id="customTagImportStatus" class="text-xs text-gray-500 dark:text-gray-400"></span>
+        </div>
+      </section>
+
       <!-- ── Appearance ── -->
       <section>
         <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Appearance</h3>
@@ -416,6 +451,30 @@
   </div>
 </div>
 
+<!-- Edit Mode Action Bar -->
+<div id="editActionBar" class="hidden fixed bottom-0 inset-x-0 z-[55]
+  bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg px-4 py-3
+  flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+  <div class="flex items-center gap-3 flex-1">
+    <span id="editSelCount" class="text-sm font-semibold text-gray-700 dark:text-gray-200">0 selected</span>
+    <button id="editSelectAllBtn"
+      class="text-xs text-primary hover:underline">Select All</button>
+    <button id="editCancelBtn"
+      class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
+  </div>
+  <div class="flex items-center gap-2">
+    <input id="editTagNameInput" type="text" maxlength="60" placeholder="Tag name…"
+      list="editTagNameSuggestions"
+      class="flex-1 min-w-0 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700
+             rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]"/>
+    <datalist id="editTagNameSuggestions"></datalist>
+    <button id="editApplyTagBtn" disabled
+      class="px-4 py-1.5 rounded-lg text-sm font-medium text-white btn-primary disabled:opacity-40 transition-colors">
+      Apply Tag
+    </button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"
   class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[60]
@@ -435,6 +494,7 @@ const IDB_NAME    = 'congregation_directory';
 const IDB_VERSION = 1;
 const DB_KEY      = 'sqlite_db';
 const SETTINGS_KEY = 'dir_settings';
+const CUSTOM_TAGS_KEY = 'dir_custom_tags';
 const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
 
 function dbLog(label, sql, params) {
@@ -457,6 +517,7 @@ const THEMES = {
 const TAG_COLORS = {
   appointment:        'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
   congregation:       'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  custom:             'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-300',
   family:             'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   field_service_group:'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   student:            'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
@@ -482,10 +543,11 @@ const TAG_LABELS = {
   public:              'Public Meeting',
   service:             'Field Service',
   duty:                'Hall Duties',
+  custom:              'Custom Tags',
 };
 
 const TAG_ORDER = ['congregation','appointment','family','field_service_group',
-  'usefor','treasures','student','living','cbs','public','service','duty'];
+  'usefor','treasures','student','living','cbs','public','service','duty','custom'];
 
 const AVATAR_COLORS = [
   'bg-blue-500','bg-emerald-500','bg-purple-500','bg-amber-500',
@@ -507,6 +569,8 @@ let fsgFilter    = null;     // selected FSG name or null
 let familyFilter = null;     // selected family head name or null
 let searchText   = '';
 let autoSyncTimer = null;
+let editMode      = false;
+let selectedPids  = new Set();
 
 let settings = {
   csvUrl:           '',
@@ -530,6 +594,34 @@ function loadSettings() {
 
 function saveSettings() {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/* ─────────────────────────────────────────
+   CUSTOM TAGS
+───────────────────────────────────────── */
+function loadCustomTags() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_TAGS_KEY) || '[]'); }
+  catch(_) { return []; }
+}
+function saveCustomTags(arr) {
+  localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(arr));
+}
+function applyCustomTags() {
+  if (!db) return;
+  db.run(`DELETE FROM tags WHERE type='custom'`);
+  const customTags = loadCustomTags();
+  if (!customTags.length) return;
+  const pidRes = db.exec(`SELECT id FROM persons`);
+  const validPids = new Set(pidRes.length ? pidRes[0].values.map(r => r[0]) : []);
+  db.run('BEGIN');
+  const stmt = db.prepare(`INSERT INTO tags VALUES (?,?,?,?)`);
+  for (const ct of customTags) {
+    for (const a of (ct.assignments || [])) {
+      if (validPids.has(a.personId)) stmt.run([a.personId, 'custom', ct.name, '']);
+    }
+  }
+  stmt.free();
+  db.run('COMMIT');
 }
 
 /* ─────────────────────────────────────────
@@ -1078,6 +1170,7 @@ async function importCSVText(csvText) {
   tagStmt.free();
   db.run('COMMIT');
 
+  applyCustomTags();
   await persistDb();
   return rows.length;
 }
@@ -1353,10 +1446,12 @@ function renderCard(p) {
   if (p.child)    badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">Child</span>`;
   if (p.removed)  badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Removed</span>`;
 
+  const isSelected = editMode && selectedPids.has(p.id);
   return `
     <div class="person-card bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm
-                border border-gray-100 dark:border-gray-800 cursor-pointer"
-         onclick="openPersonDetail(${p.id})">
+                border border-gray-100 dark:border-gray-800 cursor-pointer${isSelected ? ' selected' : ''}"
+         data-pid="${p.id}"
+         onclick="${editMode ? `toggleCardSelection(${p.id})` : `openPersonDetail(${p.id})`}">
       <div class="flex items-start gap-3">
         <div class="flex-shrink-0 w-10 h-10 rounded-full ${av}
                     flex items-center justify-center text-white font-bold text-sm">${ini}</div>
@@ -1365,7 +1460,7 @@ function renderCard(p) {
           ${genderAge}
           ${fsg}${fam}
         </div>
-        <button onclick="event.stopPropagation();downloadVCard(${p.id})"
+        ${editMode ? '' : `<button onclick="event.stopPropagation();downloadVCard(${p.id})"
                 title="Download vCard"
                 class="flex-shrink-0 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
                        text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
@@ -1373,7 +1468,7 @@ function renderCard(p) {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
-        </button>
+        </button>`}
       </div>
       ${badges ? `<div class="flex flex-wrap gap-1 mt-2">${badges}</div>` : ''}
       ${phone}${email}
@@ -1723,6 +1818,193 @@ function openPersonDetail(pid) {
 }
 
 /* ─────────────────────────────────────────
+   EDIT MODE
+───────────────────────────────────────── */
+function enterEditMode() {
+  editMode = true;
+  selectedPids = new Set();
+  document.getElementById('resultsGrid').classList.add('pb-32');
+  const btn = document.getElementById('editModeToggleBtn');
+  btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+  </svg> Done`;
+  btn.classList.add('text-primary');
+  btn.classList.remove('text-gray-500','dark:text-gray-400');
+  document.getElementById('editActionBar').classList.remove('hidden');
+  syncTagNameSuggestions();
+  updateEditActionBar();
+  renderResults();
+}
+
+function exitEditMode() {
+  editMode = false;
+  selectedPids = new Set();
+  document.getElementById('resultsGrid').classList.remove('pb-32');
+  const btn = document.getElementById('editModeToggleBtn');
+  btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+  </svg> Edit`;
+  btn.classList.remove('text-primary');
+  btn.classList.add('text-gray-500','dark:text-gray-400');
+  document.getElementById('editActionBar').classList.add('hidden');
+  document.getElementById('editTagNameInput').value = '';
+  renderResults();
+}
+
+function updateEditActionBar() {
+  const count = selectedPids.size;
+  document.getElementById('editSelCount').textContent = `${count} selected`;
+  const tagName = document.getElementById('editTagNameInput').value.trim();
+  document.getElementById('editApplyTagBtn').disabled = !(count > 0 && tagName.length > 0);
+}
+
+function toggleCardSelection(pid) {
+  if (selectedPids.has(pid)) {
+    selectedPids.delete(pid);
+  } else {
+    selectedPids.add(pid);
+  }
+  const card = document.querySelector(`.person-card[data-pid="${pid}"]`);
+  if (card) card.classList.toggle('selected', selectedPids.has(pid));
+  updateEditActionBar();
+}
+
+function selectAllCards() {
+  for (const p of currentPersons) selectedPids.add(p.id);
+  document.querySelectorAll('.person-card[data-pid]').forEach(card => card.classList.add('selected'));
+  updateEditActionBar();
+}
+
+function syncTagNameSuggestions() {
+  const dl = document.getElementById('editTagNameSuggestions');
+  if (!dl) return;
+  const tags = loadCustomTags();
+  dl.innerHTML = tags.map(t => `<option value="${h(t.name)}"></option>`).join('');
+}
+
+async function applyEditTag() {
+  const tagName = document.getElementById('editTagNameInput').value.trim();
+  if (!tagName || selectedPids.size === 0) return;
+
+  const customTags = loadCustomTags();
+  let entry = customTags.find(t => t.name === tagName);
+  if (!entry) {
+    entry = { name: tagName, assignments: [] };
+    customTags.push(entry);
+  }
+  const existingPids = new Set(entry.assignments.map(a => a.personId));
+  for (const pid of selectedPids) {
+    if (!existingPids.has(pid)) entry.assignments.push({ personId: pid });
+  }
+  saveCustomTags(customTags);
+  applyCustomTags();
+  await persistDb();
+  loadAvailTags();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  toast(`Tag "${tagName}" applied to ${selectedPids.size} person(s)`);
+  exitEditMode();
+}
+
+/* ─────────────────────────────────────────
+   CUSTOM TAG SETTINGS
+───────────────────────────────────────── */
+function renderCustomTagList() {
+  const el = document.getElementById('customTagList');
+  if (!el) return;
+  const tags = loadCustomTags();
+  if (!tags.length) {
+    el.innerHTML = '<p class="text-xs text-gray-400">No custom tags yet. Use Edit mode on the main screen to create tags.</p>';
+    return;
+  }
+  el.innerHTML = tags.map((t, idx) => `
+    <div class="flex items-center gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <span class="flex-1 text-sm font-medium truncate">${h(t.name)}</span>
+      <span class="text-xs text-gray-400">${t.assignments.length} assigned</span>
+      <button onclick="exportCustomTag(${idx})" title="Export tag"
+        class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+      </button>
+      <button onclick="deleteCustomTag(${idx})" title="Delete tag"
+        class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>`).join('');
+}
+
+function exportCustomTag(idx) {
+  const tags = loadCustomTags();
+  const t = tags[idx];
+  if (!t) return;
+  const payload = { version: 1, tagName: t.name, assignments: t.assignments };
+  const safe = t.name.replace(/[^a-z0-9]/gi, '_');
+  triggerDownload(JSON.stringify(payload, null, 2), `tag_${safe}.json`, 'application/json');
+}
+
+async function deleteCustomTag(idx) {
+  const tags = loadCustomTags();
+  const t = tags[idx];
+  if (!t) return;
+  if (!confirm(`Delete custom tag "${t.name}"? This cannot be undone.`)) return;
+  tags.splice(idx, 1);
+  saveCustomTags(tags);
+  if (db) {
+    const safeName = t.name.replace(/'/g, "''");
+    db.run(`DELETE FROM tags WHERE type='custom' AND name='${safeName}'`);
+    await persistDb();
+  }
+  loadAvailTags();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderResults();
+  renderCustomTagList();
+  toast(`Tag "${t.name}" deleted`);
+}
+
+async function importCustomTagFile(file) {
+  const statusEl = document.getElementById('customTagImportStatus');
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (data.version !== 1 || typeof data.tagName !== 'string' || !Array.isArray(data.assignments)) {
+      throw new Error('Invalid tag file format');
+    }
+    const tags = loadCustomTags();
+    let entry = tags.find(t => t.name === data.tagName);
+    if (!entry) {
+      entry = { name: data.tagName, assignments: [] };
+      tags.push(entry);
+    }
+    const existingPids = new Set(entry.assignments.map(a => a.personId));
+    let added = 0;
+    for (const a of data.assignments) {
+      if (typeof a.personId === 'number' && !existingPids.has(a.personId)) {
+        entry.assignments.push({ personId: a.personId });
+        added++;
+      }
+    }
+    saveCustomTags(tags);
+    applyCustomTags();
+    await persistDb();
+    loadAvailTags();
+    renderTagPanel('tagPanelDesktop');
+    renderTagPanel('tagPanelMobile');
+    renderCustomTagList();
+    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${added} new assignments)`;
+    toast(`Imported tag "${data.tagName}"`);
+  } catch(e) {
+    if (statusEl) statusEl.textContent = `✗ ${e.message}`;
+    toast(`Import failed: ${e.message}`);
+  }
+}
+
+/* ─────────────────────────────────────────
    THEME & APPEARANCE
 ───────────────────────────────────────── */
 function applyTheme() {
@@ -1839,6 +2121,8 @@ function openSettings() {
   const last = document.getElementById('lastSyncInfo');
   if (last) last.textContent = settings.lastSync
     ? `Last synced: ${new Date(settings.lastSync).toLocaleString()}` : '';
+  document.getElementById('customTagImportStatus').textContent = '';
+  renderCustomTagList();
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 
@@ -2102,6 +2386,20 @@ async function init() {
 
   document.getElementById('exportDbBtn').addEventListener('click', exportDb);
   document.getElementById('clearDbBtn').addEventListener('click', clearDb);
+
+  // Edit mode
+  document.getElementById('editModeToggleBtn').addEventListener('click', () =>
+    editMode ? exitEditMode() : enterEditMode());
+  document.getElementById('editSelectAllBtn').addEventListener('click', selectAllCards);
+  document.getElementById('editCancelBtn').addEventListener('click', exitEditMode);
+  document.getElementById('editTagNameInput').addEventListener('input', updateEditActionBar);
+  document.getElementById('editApplyTagBtn').addEventListener('click', applyEditTag);
+
+  // Custom tag import
+  document.getElementById('customTagImportInput').addEventListener('change', e => {
+    if (e.target.files[0]) importCustomTagFile(e.target.files[0]);
+    e.target.value = '';
+  });
 }
 
 // Expose globally for inline onclick handlers
@@ -2115,6 +2413,9 @@ window.emailAll          = emailAll;
 window.openPersonDetail  = openPersonDetail;
 window.clearFsgFilter    = clearFsgFilter;
 window.clearFamilyFilter = clearFamilyFilter;
+window.toggleCardSelection = toggleCardSelection;
+window.exportCustomTag   = exportCustomTag;
+window.deleteCustomTag   = deleteCustomTag;
 
 init().catch(console.error);
 
