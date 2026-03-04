@@ -442,10 +442,15 @@
       <!-- ── About ── -->
       <section class="pb-2">
         <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">About</h3>
-        <p class="text-xs text-gray-500 leading-relaxed">
+        <p class="text-xs text-gray-500 leading-relaxed mb-3">
           Congregation Directory — browser-based person search powered by SQLite (sql.js).<br/>
           All data is stored locally in your browser's IndexedDB storage.
         </p>
+        <button id="clearCacheBtn"
+          class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700
+                 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          Clear Cache &amp; Reload
+        </button>
       </section>
     </div>
   </div>
@@ -2383,6 +2388,15 @@ async function init() {
 
   document.getElementById('exportDbBtn').addEventListener('click', exportDb);
   document.getElementById('clearDbBtn').addEventListener('click', clearDb);
+  document.getElementById('clearCacheBtn').addEventListener('click', async () => {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    location.reload(true);
+  });
 
   // Edit mode
   document.getElementById('editModeToggleBtn').addEventListener('click', () =>
