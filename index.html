@@ -1423,11 +1423,17 @@ function renderCard(p) {
   const name  = h(p.display_name || `${p.first_name} ${p.last_name}`);
   const fsg   = p.field_service_group_name && p.field_service_group_name !== 'Unassigned'
                   ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                       <span class="font-medium text-gray-600 dark:text-gray-300">FSG:</span> ${h(p.field_service_group_name)}
+                       <span class="font-medium text-gray-600 dark:text-gray-300">FSG:</span>
+                       ${editMode
+                         ? h(p.field_service_group_name)
+                         : `<button class="text-primary hover:underline" onclick="event.stopPropagation();setFsgFilter(${h(JSON.stringify(p.field_service_group_name))})">${h(p.field_service_group_name)}</button>`}
                      </div>` : '';
   const fam   = p.family_name
                   ? `<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                       <span class="font-medium text-gray-600 dark:text-gray-300">FH:</span> ${h(p.family_name)}
+                       <span class="font-medium text-gray-600 dark:text-gray-300">FH:</span>
+                       ${editMode
+                         ? h(p.family_name)
+                         : `<button class="text-primary hover:underline" onclick="event.stopPropagation();setFamilyFilter(${h(JSON.stringify(p.family_name))})">${h(p.family_name)}</button>`}
                      </div>` : '';
 
   const genderColor = p.gender === 'Male' ? 'text-blue-400' : p.gender === 'Female' ? 'text-pink-400' : '';
@@ -1754,6 +1760,25 @@ function clearFamilyFilter() {
   familyFilter = null;
   ['familyFilterDesktop','familyFilterMobile'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderActiveFilters();
+  renderResults();
+}
+
+function setFsgFilter(name) {
+  fsgFilter = name;
+  ['fsgFilterDesktop','fsgFilterMobile'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = name;
+  });
+  loadSelectOptions();
+  renderActiveFilters();
+  renderResults();
+}
+
+function setFamilyFilter(name) {
+  familyFilter = name;
+  ['familyFilterDesktop','familyFilterMobile'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = name;
   });
   renderActiveFilters();
   renderResults();
@@ -2473,6 +2498,8 @@ window.emailAll          = emailAll;
 window.openPersonDetail  = openPersonDetail;
 window.clearFsgFilter    = clearFsgFilter;
 window.clearFamilyFilter = clearFamilyFilter;
+window.setFsgFilter      = setFsgFilter;
+window.setFamilyFilter   = setFamilyFilter;
 window.toggleCardSelection = toggleCardSelection;
 window.exportCustomTag   = exportCustomTag;
 window.deleteCustomTag   = deleteCustomTag;
