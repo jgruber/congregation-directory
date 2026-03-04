@@ -1889,13 +1889,12 @@ async function applyEditTag() {
 
   const customTags = loadCustomTags();
   let entry = customTags.find(t => t.name === tagName);
-  if (!entry) {
-    entry = { name: tagName, assignments: [] };
+  if (entry) {
+    if (!confirm(`A custom tag named "${tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${selectedPids.size} currently selected person(s). Continue?`)) return;
+    entry.assignments = Array.from(selectedPids).map(pid => ({ personId: pid }));
+  } else {
+    entry = { name: tagName, assignments: Array.from(selectedPids).map(pid => ({ personId: pid })) };
     customTags.push(entry);
-  }
-  const existingPids = new Set(entry.assignments.map(a => a.personId));
-  for (const pid of selectedPids) {
-    if (!existingPids.has(pid)) entry.assignments.push({ personId: pid });
   }
   saveCustomTags(customTags);
   applyCustomTags();
@@ -1976,18 +1975,16 @@ async function importCustomTagFile(file) {
       throw new Error('Invalid tag file format');
     }
     const tags = loadCustomTags();
+    const newAssignments = data.assignments.filter(a => typeof a.personId === 'number');
     let entry = tags.find(t => t.name === data.tagName);
-    if (!entry) {
-      entry = { name: data.tagName, assignments: [] };
-      tags.push(entry);
-    }
-    const existingPids = new Set(entry.assignments.map(a => a.personId));
-    let added = 0;
-    for (const a of data.assignments) {
-      if (typeof a.personId === 'number' && !existingPids.has(a.personId)) {
-        entry.assignments.push({ personId: a.personId });
-        added++;
+    if (entry) {
+      if (!confirm(`A custom tag named "${data.tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${newAssignments.length} assignment(s) from the imported file. Continue?`)) {
+        if (statusEl) statusEl.textContent = 'Import cancelled.';
+        return;
       }
+      entry.assignments = newAssignments;
+    } else {
+      tags.push({ name: data.tagName, assignments: newAssignments });
     }
     saveCustomTags(tags);
     applyCustomTags();
@@ -1996,7 +1993,7 @@ async function importCustomTagFile(file) {
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
     renderCustomTagList();
-    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${added} new assignments)`;
+    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${newAssignments.length} assignments)`;
     toast(`Imported tag "${data.tagName}"`);
   } catch(e) {
     if (statusEl) statusEl.textContent = `✗ ${e.message}`;
