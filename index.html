@@ -408,7 +408,7 @@
                         bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200
                         hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
             Import Tag File
-            <input type="file" id="customTagImportInput" accept=".json" class="hidden"/>
+            <input type="file" id="customTagImportInput" accept=".json" multiple class="hidden"/>
           </label>
           <span id="customTagImportStatus" class="text-xs text-gray-500 dark:text-gray-400"></span>
         </div>
@@ -2410,7 +2410,7 @@ async function init() {
 
   // Custom tag import
   document.getElementById('customTagImportInput').addEventListener('change', e => {
-    if (e.target.files[0]) importCustomTagFile(e.target.files[0]);
+    for (const file of e.target.files) importCustomTagFile(file);
     e.target.value = '';
   });
 }
