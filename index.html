@@ -2097,8 +2097,8 @@ function syncDarkModeUI() {
 ───────────────────────────────────────── */
 async function fetchCSVFromURL(statusElId) {
   const url  = document.getElementById('csvUrlInput').value.trim() || settings.csvUrl;
-  const user = document.getElementById('csvUsernameInput').value.trim();
-  const pass = document.getElementById('csvPasswordInput').value;
+  const user = document.getElementById('csvUsernameInput').value.trim() || settings.csvUsername || '';
+  const pass = document.getElementById('csvPasswordInput').value || settings.csvPassword || '';
 
   if (!url) { toast('Please enter a URL'); return; }
 
