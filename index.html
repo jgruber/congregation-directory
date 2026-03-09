@@ -347,7 +347,7 @@
         <!-- URL fetch -->
         <div class="space-y-3">
           <label class="block text-sm font-medium">Auto-Fetch from URL <span class="text-xs text-gray-400 font-normal">(with BASIC auth)</span></label>
-          <input type="url" id="csvUrlInput" placeholder="https://your-server.example/data/Persons.csv"
+          <input type="url" id="csvUrlInput" placeholder="https://your-server.example"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
                    bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]" />
           <div class="grid grid-cols-2 gap-2">
@@ -2102,6 +2102,16 @@ async function fetchCSVFromURL(statusElId) {
 
   if (!url) { toast('Please enter a URL'); return; }
 
+  // Normalize to origin + /download regardless of what path the user typed
+  let csvUrl, tagsUrl;
+  try {
+    const origin = new URL(url).origin;
+    csvUrl  = origin + '/download';
+    tagsUrl = origin + '/download?tags';
+  } catch(e) {
+    toast('Invalid URL'); return;
+  }
+
   const statusEl = document.getElementById(statusElId);
   if (statusEl) statusEl.textContent = '⏳ Fetching…';
 
@@ -2109,7 +2119,7 @@ async function fetchCSVFromURL(statusElId) {
     const headers = {};
     if (user || pass) headers['Authorization'] = 'Basic ' + btoa(`${user}:${pass}`);
 
-    const res = await fetch(url, { headers });
+    const res = await fetch(csvUrl, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
     const text  = await res.text();
@@ -2121,11 +2131,10 @@ async function fetchCSVFromURL(statusElId) {
     settings.csvPassword = pass;
     saveSettings();
 
-    // Fetch custom tags from the same URL with ?tags appended
+    // Fetch custom tags from <origin>/download?tags
     let tagsImported = 0;
     try {
       if (statusEl) statusEl.textContent = '⏳ Fetching tags…';
-      const tagsUrl = url + (url.includes('?') ? '&' : '?') + 'tags';
       const tagsRes = await fetch(tagsUrl, { headers });
       if (tagsRes.ok) {
         const tagList = await tagsRes.json();
