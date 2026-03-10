@@ -6,7 +6,7 @@ A standalone, browser-based person directory search application built as a singl
 
 ## Getting Started
 
-1. Open `directory.html` in any modern browser (Chrome, Firefox, Edge, Safari).
+1. Open `index.html` in any modern browser (Chrome, Firefox, Edge, Safari).
 2. Click **Open Settings & Import** (or the ⚙️ icon in the top-right corner).
 3. Under **Data Import**, upload your `Persons.csv` file or configure a URL to fetch it from.
 4. The directory loads and is ready to search.
@@ -263,7 +263,7 @@ Tested on current versions of Chrome, Firefox, Edge, and Safari.
 
 ## Relationship to `syncPersons.py`
 
-`directory.html` is the browser-side counterpart to the Python `syncPersons.py` script. It reproduces the same data processing logic entirely in JavaScript:
+`index.html` is the browser-side counterpart to the Python `syncPersons.py` script. It reproduces the same data processing logic entirely in JavaScript:
 
 - Parses the `Persons.csv` format (including quoted multiline fields)
 - Builds the same SQLite table schema (`persons`, `families`, `field_service_groups`, `congregations`, `tags`)
