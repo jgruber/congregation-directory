@@ -64,12 +64,14 @@ Tap or click any card to open a **detail modal** showing full contact informatio
 **Manual CSV Upload**
 - Click or drag-and-drop a `Persons.csv` file onto the upload area in Settings.
 - The file must match the column structure exported by the congregation management software (see [CSV Format](#csv-format) below).
+- `Persons.csv` can be exported from the **New World Scheduler** application.
 
 **Auto-Fetch from URL**
 - Enter a URL pointing to a hosted `Persons.csv` file.
 - Enter a username and password if the URL requires HTTP Basic authentication.
 - Click **Fetch Now** to import immediately.
 - Set an **Auto-sync interval** (hourly, 6-hourly, daily, or weekly) to have the app check for updates automatically on startup.
+- The URL can target a deployment of [persons-uploader](https://github.com/jgruber/persons-uploader), a companion app that serves the latest `Persons.csv` export over HTTP.
 
 ### Database
 
@@ -89,7 +91,7 @@ Accessed via the ⚙️ Settings menu:
 
 ## CSV Format
 
-The application expects a CSV file with the standard column headers produced by the congregation management software. Required columns include:
+The application expects a CSV file with the standard column headers produced by the congregation management software. `Persons.csv` can be exported from the **New World Scheduler** application. Required columns include:
 
 | Column | Description |
 |---|---|
