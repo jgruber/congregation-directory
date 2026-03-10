@@ -115,6 +115,126 @@ The application expects a CSV file with the standard column headers produced by 
 
 ---
 
+## Customizing Congregation-Specific Tag Columns
+
+Several `Persons.csv` columns exported by New World Scheduler are generic — their meaning varies by congregation. `index.html` must be edited manually to reflect what each column means for your congregation.
+
+### Where to edit in `index.html`
+
+Search for the comment block:
+
+```
+// ── CONGREGATION CUSTOMIZATION START ─
+```
+
+Everything between that marker and `// ── CONGREGATION CUSTOMIZATION END ─` is the area you need to edit. Each entry in the `useForMap` array follows this format:
+
+```js
+['CsvColumnName', 'tagType', 'Tag label shown in UI'],
+```
+
+- **`CsvColumnName`** — the exact column header from `Persons.csv`
+- **`tagType`** — controls which category section the tag appears in (see table below)
+- **`'Tag label shown in UI'`** — the text shown on the tag chip and in the filter panel
+
+To add a tag for any other `True`/`False` column in `Persons.csv` that is not already listed, append a new entry in the same format. Columns that contain `False` are silently ignored, so unused entries cause no harm.
+
+**Available tag types:**
+
+| `tagType` value | UI category heading |
+|---|---|
+| `congregation` | Congregation Status |
+| `appointment` | Appointment |
+| `family` | Family |
+| `field_service_group` | Field Service Group |
+| `usefor` | Meeting Assignments |
+| `treasures` | Treasures from God's Word |
+| `student` | OCLM / Student |
+| `living` | Living as Christians |
+| `cbs` | Congregation Bible Study |
+| `public` | Public Meeting |
+| `service` | Field Service |
+| `duty` | Hall Duties |
+
+---
+
+### `UseForDuty[N]` — Hall Duties
+
+New World Scheduler exports up to seven `UseForDuty[N]` boolean columns. By default, `index.html` maps them as follows:
+
+| CSV Column | Default Tag Name |
+|---|---|
+| `UseForDuty1` | Auditorium Attendant |
+| `UseForDuty2` | Entrance Attendant |
+| `UseForDuty3` | Video Conference Host |
+| `UseForDuty4` | Microphone Carrier |
+| `UseForDuty6` | Audio/Video Operator |
+| `UseForDuty7` | Stage Attendant |
+
+> **Note:** `UseForDuty5` is omitted by default — add it explicitly if your congregation uses it.
+
+To rename a duty, change the third element of the relevant entry. For example, if `UseForDuty5` is used for "Sound Desk Operator":
+
+```js
+['UseForDuty5', 'duty', 'Sound Desk Operator'],
+```
+
+---
+
+### `UseForCleaningType[N]` — Cleaning Groups
+
+New World Scheduler exports `UseForCleaningType[N]` boolean columns whose meaning (e.g. which cleaning roster a person is on) is entirely congregation-specific. The default mapping uses placeholder names:
+
+| CSV Column | Default Tag Name |
+|---|---|
+| `UseForCleaningType1` | Cleaning Group 1 |
+| `UseForCleaningType2` | Cleaning Group 2 |
+| `UseForCleaningType3` | Cleaning Group 3 |
+| `UseForCleaningType4` | Cleaning Group 4 |
+
+Change the tag label to match your congregation's actual cleaning group names. Remove or comment-out rows for columns your CSV does not include.
+
+---
+
+### `UseForGardenCareType[N]` — Garden / Grounds Care Groups
+
+`UseForGardenCareType[N]` columns follow the same pattern. The default mapping uses placeholder names:
+
+| CSV Column | Default Tag Name |
+|---|---|
+| `UseForGardenCareType1` | Garden Care Group 1 |
+| `UseForGardenCareType2` | Garden Care Group 2 |
+| `UseForGardenCareType3` | Garden Care Group 3 |
+| `UseForGardenCareType4` | Garden Care Group 4 |
+
+Change the tag label to match your congregation's actual garden care group names. Remove or comment-out rows for columns your CSV does not include.
+
+---
+
+### Renaming the "Hall Duties" category heading or colour
+
+All `duty`-type tags (hall duties, cleaning, and garden care) share the same category heading and chip colour. To rename the heading shown in the filter panel and detail modal, find the `TAG_LABELS` object and change the `duty` value:
+
+```js
+duty: 'Hall Duties',   // ← change to suit your congregation
+```
+
+To change the chip colour, find `TAG_COLORS` and update the `duty` entry using Tailwind CSS utility classes:
+
+```js
+duty: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+```
+
+### Summary of changes required per customization
+
+| What you're changing | Where to edit |
+|---|---|
+| Which CSV column maps to which tag label | `useForMap` array between the `CONGREGATION CUSTOMIZATION` comments |
+| Category heading in the UI | `TAG_LABELS.duty` |
+| Chip colour in the UI | `TAG_COLORS.duty` |
+
+---
+
 ## Technical Details
 
 | Component | Technology |

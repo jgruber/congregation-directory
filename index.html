@@ -1118,8 +1118,10 @@ async function importCSVText(csvText) {
         tags.push({ person_id: pid, type:'congregation', name:'Regular', value:'' });
     }
 
-    // Moved
-    if (isMoved) tags.push({ person_id: pid, type:'congregation', name:'Moved', value:'' });
+    // Moved / Removed / Incarcerated
+    if (isMoved)                          tags.push({ person_id: pid, type:'congregation', name:'Moved',        value:'' });
+    if (row['Removed']      === 'True')   tags.push({ person_id: pid, type:'congregation', name:'Removed',      value:'' });
+    if (row['Incarcerated'] === 'True')   tags.push({ person_id: pid, type:'congregation', name:'Incarcerated', value:'' });
 
     // Pioneer
     if (pioneer)   tags.push({ person_id:pid, type:'appointment', name:'Regular Pioneer',              value:'' });
@@ -1130,7 +1132,20 @@ async function importCSVText(csvText) {
     if (row['CLMStudent'] === 'True')
       tags.push({ person_id:pid, type:'student', name:'OCLM Enrolled', value:'' });
 
-    // UseFor map
+    // ── UseFor map ──────────────────────────────────────────────────────────────
+    // Maps Persons.csv TRUE/FALSE columns to tags shown in the directory.
+    // Each entry: ['CsvColumnName', 'tagType', 'Tag label shown in UI']
+    //
+    // ── CONGREGATION CUSTOMIZATION START ────────────────────────────────────────
+    // The columns below are generic and their meaning varies by congregation.
+    // Edit the third element of each entry to match what your congregation uses
+    // each column for.  To add a tag for any other TRUE/FALSE Persons.csv column
+    // not already listed here, append a new entry in the same format:
+    //   ['CsvColumnName', 'tagType', 'Tag label shown in UI'],
+    // Available tagType values and their UI category headings:
+    //   'congregation', 'appointment', 'family', 'field_service_group',
+    //   'usefor' (Meeting Assignments), 'treasures', 'student', 'living',
+    //   'cbs', 'public', 'service', 'duty' (Hall Duties), 'custom'
     const useForMap = [
       ['UseForChairman',              'usefor',   'Midweek Chairman'],
       ['UseForAuxiliaryCounselor',    'usefor',   'Midweek Classroom Counselor'],
@@ -1156,13 +1171,46 @@ async function importCSVText(csvText) {
       ['UseForConductFSGroups',       'service',  'Meeting for Field Service Conductor'],
       ['UseForFSPrayers',             'service',  'Meeting for Field Service Prayer'],
       ['UseForMaintenance',           'service',  'Local Maintenance Volunteer'],
+      // Hall Duties — UseForDuty[N] columns are congregation-specific.
+      // Change the tag label to match what your congregation uses each slot for.
+      // UseForDuty5 is omitted by default; add it here if your congregation uses it.
       ['UseForDuty1',                 'duty',     'Auditorium Attendant'],
       ['UseForDuty2',                 'duty',     'Entrance Attendant'],
       ['UseForDuty3',                 'duty',     'Video Conference Host'],
       ['UseForDuty4',                 'duty',     'Microphone Carrier'],
+      // ['UseForDuty5',                 'duty',     ''],
       ['UseForDuty6',                 'duty',     'Audio/Video Operator'],
       ['UseForDuty7',                 'duty',     'Stage Attendant'],
+      ['UseForHospitality',           'duty',     'Hospitality'],
+      // ['UseForDuty8',                 'duty',     ''],
+      // ['UseForDuty9',                 'duty',     ''],
+      // Cleaning — UseForCleaningType[N] columns are congregation-specific.
+      // Change the tag label to match your congregation's cleaning group names.
+      // Remove or comment-out rows for columns your CSV does not include.
+      ['UseForCleaningType1',         'duty',     'Weekly Hall Clean'],
+      ['UseForCleaningType2',         'duty',     'After Meeting Clean'],
+      ['UseForCleaningType3',         'duty',     'Monthly Hall Clean'],
+      ['UseForCleaningType4',         'duty',     'Quarterly Hall Clean'],
+      // Garden / grounds care — UseForGardenCareType[N] columns are congregation-specific.
+      // Change the tag label to match your congregation's garden care group names.
+      // Remove or comment-out rows for columns your CSV does not include.
+      ['UseForGardenCareType1',       'duty',     'Flowerbeds'],
+      ['UseForGardenCareType2',       'duty',     'Lawn'],
+      // Other TRUE/FALSE Persons.csv fields
+      // Custom spiritual flags — CustomSpiritual[N] columns are congregation-specific.
+      // Change the tag label to match what your congregation uses each column for.
+      // Remove or comment-out rows for columns your CSV does not include.
+      // Note: the paired CustomSpiritual[N]Text column is intentionally ignored here;
+      // the tag label is set manually below so it is consistent across all persons.
+      // ['CustomSpiritual4',            'duty',     ''],
+      // ['CustomSpiritual5',            'duty',     ''],
+      // ['CustomSpiritual6',            'duty',     ''],
+      // Other custom TRUE/FALSE columns — uncomment and label as needed.
+      // ['UseForCustomWeekendAssignment1', 'duty',  ''],
+      // ['UseForCustomWeekendAssignment2', 'duty',  ''],
+      // ['UseForCustomFS',               'duty',    ''],
     ];
+    // ── CONGREGATION CUSTOMIZATION END ──────────────────────────────────────────
     for (const [col, type, name] of useForMap) {
       if (row[col] === 'True') tags.push({ person_id:pid, type, name, value:'' });
     }
