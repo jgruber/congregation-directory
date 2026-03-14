@@ -2858,13 +2858,14 @@ function renderFsgStatsChart() {
   const groupMap = {};
   for (const p of persons) {
     const fsg = p.field_service_group_name || 'Unassigned';
-    if (!groupMap[fsg]) groupMap[fsg] = { elders: 0, ms: 0, pioneers: 0, active: 0, total: 0 };
+    if (!groupMap[fsg]) groupMap[fsg] = { elders: 0, ms: 0, pioneers: 0, active: 0, inactive: 0, total: 0 };
     const g = groupMap[fsg];
     g.total++;
     if (p.elder)                               g.elders++;
     if (p.ministerial_servant)                 g.ms++;
     if (p.special_pioneer || p.pioneer)        g.pioneers++;
     if (!p.inactive && !p.moved && !p.removed) g.active++;
+    if (p.inactive)                            g.inactive++;
   }
 
   // Named groups alphabetically, Unassigned last
@@ -2886,10 +2887,11 @@ function renderFsgStatsChart() {
     data: {
       labels,
       datasets: [
-        { label: 'Elders',        data: labels.map(l => groupMap[l].elders),  backgroundColor: '#8b5cf6' },
-        { label: 'Min. Servants', data: labels.map(l => groupMap[l].ms),      backgroundColor: '#3b82f6' },
+        { label: 'Elders',        data: labels.map(l => groupMap[l].elders),   backgroundColor: '#8b5cf6' },
+        { label: 'Min. Servants', data: labels.map(l => groupMap[l].ms),       backgroundColor: '#3b82f6' },
         { label: 'Pioneers',      data: labels.map(l => groupMap[l].pioneers), backgroundColor: '#10b981' },
-        { label: 'Active',        data: labels.map(l => groupMap[l].active),  backgroundColor: '#f59e0b' },
+        { label: 'Active',        data: labels.map(l => groupMap[l].active),   backgroundColor: '#f59e0b' },
+        { label: 'Inactive',      data: labels.map(l => groupMap[l].inactive), backgroundColor: '#ef4444' },
       ]
     },
     options: {
@@ -2918,6 +2920,7 @@ function renderFsgStatsChart() {
       <td class="py-1.5 px-2 text-center text-blue-600 dark:text-blue-400">${g.ms || '—'}</td>
       <td class="py-1.5 px-2 text-center text-emerald-600 dark:text-emerald-400">${g.pioneers || '—'}</td>
       <td class="py-1.5 px-2 text-center text-amber-600 dark:text-amber-400">${g.active}</td>
+      <td class="py-1.5 px-2 text-center text-red-600 dark:text-red-400">${g.inactive || '—'}</td>
       <td class="py-1.5 pl-2 text-center text-gray-500 dark:text-gray-400">${g.total}</td>
     </tr>`;
   }).join('');
@@ -2931,6 +2934,7 @@ function renderFsgStatsChart() {
           <th class="pb-1.5 px-2 text-center font-medium text-blue-600 dark:text-blue-400">Min. Servants</th>
           <th class="pb-1.5 px-2 text-center font-medium text-emerald-600 dark:text-emerald-400">Pioneers</th>
           <th class="pb-1.5 px-2 text-center font-medium text-amber-600 dark:text-amber-400">Active</th>
+          <th class="pb-1.5 px-2 text-center font-medium text-red-600 dark:text-red-400">Inactive</th>
           <th class="pb-1.5 pl-2 text-center font-medium text-gray-500 dark:text-gray-400">Total</th>
         </tr>
       </thead>
