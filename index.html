@@ -2924,7 +2924,7 @@ function toggleMapFullscreen() {
   const isFs = content.dataset.fs === '1';
   if (!isFs) {
     content.dataset.fs = '1';
-    content.style.cssText = 'position:fixed;inset:0;max-width:none;max-height:none;border-radius:0;z-index:50;';
+    content.style.cssText = 'position:fixed;inset:0;max-width:none;max-height:none;border-radius:0;z-index:40;';
   } else {
     content.dataset.fs = '0';
     content.style.cssText = '';
@@ -2939,8 +2939,6 @@ function toggleMapFullscreen() {
 }
 
 function mapOpenPerson(id) {
-  const content = document.getElementById('mapModalContent');
-  if (content.dataset.fs === '1') toggleMapFullscreen();
   openPersonDetail(id);
 }
 
