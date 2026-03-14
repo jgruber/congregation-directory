@@ -2917,45 +2917,32 @@ async function geocodeMapAddresses() {
   subtitle.textContent += ' — done';
 }
 
+// CSS-based fullscreen — avoids the native Fullscreen API which causes the OS
+// window to lose focus on Windows, making the page unresponsive after exit.
 function toggleMapFullscreen() {
   const content = document.getElementById('mapModalContent');
-  if (!document.fullscreenElement) {
-    content.requestFullscreen().catch(err => console.warn('Fullscreen error:', err));
+  const isFs = content.dataset.fs === '1';
+  if (!isFs) {
+    content.dataset.fs = '1';
+    content.style.cssText = 'position:fixed;inset:0;max-width:none;max-height:none;border-radius:0;z-index:50;';
   } else {
-    document.exitFullscreen();
+    content.dataset.fs = '0';
+    content.style.cssText = '';
   }
-}
-
-// Open person detail, exiting fullscreen first if active (personModal is outside
-// the fullscreen element and cannot render above it while fullscreen is active).
-function mapOpenPerson(id) {
-  if (document.fullscreenElement) {
-    document.exitFullscreen().then(() => setTimeout(() => openPersonDetail(id), 50));
-  } else {
-    openPersonDetail(id);
-  }
-}
-
-document.addEventListener('fullscreenchange', () => {
-  const isFs = !!document.fullscreenElement;
-  if (_map) {
-    setTimeout(() => {
-      _map.invalidateSize();
-      if (!isFs) {
-        // Reset Leaflet drag state — leaving fullscreen can leave pointer events locked
-        _map.dragging.disable();
-        _map.dragging.enable();
-        // Restore window focus so the page responds to input immediately
-        window.focus();
-      }
-    }, 150);
-  }
+  if (_map) setTimeout(() => _map.invalidateSize(), 150);
   const btn = document.getElementById('mapFullscreenBtn');
   if (!btn) return;
-  btn.title = isFs ? 'Exit fullscreen' : 'Fullscreen';
-  btn.querySelector('.fs-icon-expand').classList.toggle('hidden', isFs);
-  btn.querySelector('.fs-icon-contract').classList.toggle('hidden', !isFs);
-});
+  const nowFs = content.dataset.fs === '1';
+  btn.title = nowFs ? 'Exit fullscreen' : 'Fullscreen';
+  btn.querySelector('.fs-icon-expand').classList.toggle('hidden', nowFs);
+  btn.querySelector('.fs-icon-contract').classList.toggle('hidden', !nowFs);
+}
+
+function mapOpenPerson(id) {
+  const content = document.getElementById('mapModalContent');
+  if (content.dataset.fs === '1') toggleMapFullscreen();
+  openPersonDetail(id);
+}
 
 // ── FSG Stats Modal ───────────────────────────────────────────────────────────
 let _fsgChart = null;
