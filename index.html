@@ -342,17 +342,27 @@
 <!-- ═══════════════════════ MAP MODAL ═══════════════════════ -->
 <div id="mapModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
   <div onclick="closeMapModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-4xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+  <div id="mapModalContent" class="relative bg-white dark:bg-gray-900 w-full sm:max-w-4xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
       <div class="flex items-center gap-3">
         <h2 class="text-base font-semibold">Map</h2>
         <span id="mapModalSubtitle" class="text-xs text-gray-400"></span>
       </div>
-      <button onclick="closeMapModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
+      <div class="flex items-center gap-1">
+        <button id="mapFullscreenBtn" onclick="toggleMapFullscreen()" title="Fullscreen" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+          <svg class="w-5 h-5 fs-icon-expand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+          <svg class="w-5 h-5 fs-icon-contract hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
+          </svg>
+        </button>
+        <button onclick="closeMapModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="flex-1 overflow-hidden" style="min-height:400px">
       <div id="mapContainer" class="w-full h-full" style="min-height:400px"></div>
@@ -1397,7 +1407,7 @@ function buildQuery() {
             p.address, p.city, p.state, p.postal_code,
             p.elder, p.ministerial_servant, p.pioneer, p.regular_auxiliary,
             p.special_pioneer, p.inactive, p.moved, p.removed, p.child,
-            p.date_of_birth, p.date_of_baptism,
+            p.date_of_birth, p.date_of_baptism, p.baptized, p.family_id, p.family_head,
             p.latitude, p.longitude
           FROM persons p ${w}
           ORDER BY p.last_name, p.first_name
@@ -2701,12 +2711,40 @@ function closeMapModal() {
 let _markerGroup = null;
 let _geocodeCache = {};   // address → {lat, lng}
 let _geocoding = false;
+let _familyGroups = [];   // built from currentPersons each render
 
-function mapMarkerColor(p) {
-  if (p.elder)                        return '#8b5cf6';
-  if (p.ministerial_servant)          return '#3b82f6';
-  if (p.special_pioneer || p.pioneer) return '#10b981';
-  return '#6b7280';
+// Group persons into families. Persons sharing a family_id (or family_name when
+// family_id is absent) are merged into one map marker.
+function buildFamilyGroups(persons) {
+  const map = new Map();
+  for (const p of persons) {
+    const key = p.family_id ? `fid_${p.family_id}` : p.family_name ? `fn_${p.family_name}` : `solo_${p.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        name: p.family_name || p.display_name,
+        members: [],
+        full_address: p.full_address,
+        field_service_group_name: p.field_service_group_name,
+        latitude: null,
+        longitude: null,
+      });
+    }
+    const fam = map.get(key);
+    fam.members.push(p);
+    if (!fam.latitude && p.latitude) { fam.latitude = p.latitude; fam.longitude = p.longitude; }
+  }
+  return [...map.values()];
+}
+
+// Precedence: elder > ministerial servant > special pioneer > regular pioneer > publisher > unbaptized
+function familyMarkerColor(fam) {
+  const m = fam.members;
+  if (m.some(p => p.elder))               return '#8b5cf6';
+  if (m.some(p => p.ministerial_servant)) return '#3b82f6';
+  if (m.some(p => p.special_pioneer))     return '#0d9488';
+  if (m.some(p => p.pioneer))             return '#10b981';
+  if (m.some(p => p.baptized))            return '#f59e0b';
+  return '#9ca3af';
 }
 
 function mapMakeIcon(color) {
@@ -2717,27 +2755,68 @@ function mapMakeIcon(color) {
   });
 }
 
-function mapAddMarker(p) {
-  const color = mapMarkerColor(p);
-  const appt  = p.elder ? 'Elder' : p.ministerial_servant ? 'Min. Servant'
-              : p.special_pioneer ? 'Sp. Pioneer' : p.pioneer ? 'Pioneer' : '';
-  const popup = `<b>${h(p.display_name)}</b>${appt ? `<br><span style="color:${color}">${appt}</span>` : ''}
-                 ${p.field_service_group_name ? `<br>${h(p.field_service_group_name)}` : ''}
-                 ${p.full_address ? `<br><small>${h(p.full_address)}</small>` : ''}`;
-  L.marker([p.latitude, p.longitude], { icon: mapMakeIcon(color) })
-   .bindPopup(popup)
+function memberCategoryLabel(p) {
+  if (p.elder)               return { label: 'Elder',        color: '#8b5cf6' };
+  if (p.ministerial_servant) return { label: 'Min. Servant', color: '#3b82f6' };
+  if (p.special_pioneer)     return { label: 'Sp. Pioneer',  color: '#0d9488' };
+  if (p.pioneer)             return { label: 'Pioneer',      color: '#10b981' };
+  if (p.baptized)            return { label: 'Publisher',    color: '#f59e0b' };
+  return                            { label: 'Unbaptized',   color: '#9ca3af' };
+}
+
+function personAgeYears(p) {
+  if (!p.date_of_birth) return null;
+  const dob = new Date(p.date_of_birth);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+function mapAddFamilyMarker(fam) {
+  const color = familyMarkerColor(fam);
+  const sorted = [...fam.members].sort((a, b) => {
+    if (a.family_head && !b.family_head) return -1;
+    if (!a.family_head && b.family_head) return 1;
+    const ageA = personAgeYears(a) ?? -1;
+    const ageB = personAgeYears(b) ?? -1;
+    return ageB - ageA;  // oldest first
+  });
+  const memberRows = sorted.map(p => {
+    const { label, color: catColor } = memberCategoryLabel(p);
+    const age = personAgeYears(p);
+    const ageStr = age !== null ? `<span style="color:#9ca3af;font-size:0.75em">${age}</span>` : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0">
+      <span style="display:flex;align-items:center;gap:4px">
+        <a href="javascript:void(0)" onclick="openPersonDetail(${p.id})"
+           style="color:#2563eb;text-decoration:underline;white-space:nowrap">${h(p.display_name)}</a>
+        ${ageStr}
+      </span>
+      <span style="color:${catColor};font-size:0.75em;white-space:nowrap">${label}</span>
+    </div>`;
+  }).join('');
+  const popup = `<div style="min-width:180px">
+    <b>${h(fam.name)}</b>
+    ${fam.field_service_group_name ? `<div style="color:#6b7280;font-size:0.8em">${h(fam.field_service_group_name)}</div>` : ''}
+    ${fam.full_address ? `<div style="color:#6b7280;font-size:0.75em">${h(fam.full_address)}</div>` : ''}
+    <div style="margin-top:6px;border-top:1px solid #e5e7eb;padding-top:6px">${memberRows}</div>
+  </div>`;
+  L.marker([fam.latitude, fam.longitude], { icon: mapMakeIcon(color) })
+   .bindPopup(popup, { minWidth: 180 })
    .addTo(_markerGroup);
 }
 
 function mapUpdateSubtitle() {
-  const withCoords = currentPersons.filter(p => p.latitude && p.longitude).length;
-  const total = currentPersons.length;
+  const withCoords = _familyGroups.filter(f => f.latitude && f.longitude).length;
+  const total = _familyGroups.length;
   document.getElementById('mapModalSubtitle').textContent =
-    withCoords < total ? `${withCoords} of ${total} persons placed` : `${total} persons`;
+    withCoords < total ? `${withCoords} of ${total} families placed` : `${total} families`;
 }
 
 function renderMap() {
   if (_map) { _map.remove(); _map = null; _markerGroup = null; }
+  _familyGroups = buildFamilyGroups(currentPersons);
 
   const mapEl = document.getElementById('mapContainer');
   _map = L.map(mapEl);
@@ -2748,16 +2827,16 @@ function renderMap() {
 
   _markerGroup = L.featureGroup().addTo(_map);
 
-  // Apply cached geocode results to persons that lack coords
-  for (const p of currentPersons) {
-    if ((!p.latitude || !p.longitude) && p.full_address) {
-      const cached = _geocodeCache[p.full_address.trim()];
-      if (cached) { p.latitude = cached.lat; p.longitude = cached.lng; }
+  // Apply cached geocode results to families without coords
+  for (const fam of _familyGroups) {
+    if (!fam.latitude && fam.full_address) {
+      const cached = _geocodeCache[fam.full_address.trim()];
+      if (cached) { fam.latitude = cached.lat; fam.longitude = cached.lng; }
     }
   }
 
-  for (const p of currentPersons.filter(p => p.latitude && p.longitude)) {
-    mapAddMarker(p);
+  for (const fam of _familyGroups.filter(f => f.latitude && f.longitude)) {
+    mapAddFamilyMarker(fam);
   }
 
   const bounds = _markerGroup.getBounds();
@@ -2769,16 +2848,17 @@ function renderMap() {
 
   mapUpdateSubtitle();
 
-  // Show geocode button if any persons are missing coords and have an address
-  const needsGeocode = currentPersons.some(p => (!p.latitude || !p.longitude) && p.full_address);
+  const needsGeocode = _familyGroups.some(f => (!f.latitude || !f.longitude) && f.full_address);
   document.getElementById('mapGeocodeBtn').classList.toggle('hidden', !needsGeocode);
 
   // Legend
   const legendItems = [
     { color: '#8b5cf6', label: 'Elder' },
     { color: '#3b82f6', label: 'Min. Servant' },
+    { color: '#0d9488', label: 'Sp. Pioneer' },
     { color: '#10b981', label: 'Pioneer' },
-    { color: '#6b7280', label: 'Publisher' },
+    { color: '#f59e0b', label: 'Publisher' },
+    { color: '#9ca3af', label: 'Unbaptized' },
   ];
   document.getElementById('mapLegend').innerHTML = legendItems.map(i =>
     `<span class="flex items-center gap-1.5">
@@ -2796,11 +2876,11 @@ async function geocodeMapAddresses() {
 
   // Collect unique addresses that still need geocoding
   const toGeocode = new Map();
-  for (const p of currentPersons) {
-    if ((!p.latitude || !p.longitude) && p.full_address) {
-      const addr = p.full_address.trim();
+  for (const fam of _familyGroups) {
+    if ((!fam.latitude || !fam.longitude) && fam.full_address) {
+      const addr = fam.full_address.trim();
       if (!_geocodeCache[addr] && !toGeocode.has(addr)) toGeocode.set(addr, []);
-      if (!_geocodeCache[addr]) toGeocode.get(addr).push(p);
+      if (!_geocodeCache[addr]) toGeocode.get(addr).push(fam);
     }
   }
 
@@ -2808,10 +2888,10 @@ async function geocodeMapAddresses() {
   const total = toGeocode.size;
   const subtitle = document.getElementById('mapModalSubtitle');
 
-  for (const [addr, persons] of toGeocode) {
+  for (const [addr, famList] of toGeocode) {
     subtitle.textContent = `Geocoding ${done + 1} of ${total}…`;
     try {
-      const res  = await fetch(
+      const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`,
         { headers: { 'Accept-Language': 'en', 'User-Agent': 'CongregationDirectory/1.0' } }
       );
@@ -2819,9 +2899,9 @@ async function geocodeMapAddresses() {
       if (data.length) {
         const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
         _geocodeCache[addr] = { lat, lng };
-        for (const p of persons) {
-          p.latitude = lat; p.longitude = lng;
-          mapAddMarker(p);
+        for (const fam of famList) {
+          fam.latitude = lat; fam.longitude = lng;
+          mapAddFamilyMarker(fam);
         }
         const bounds = _markerGroup.getBounds();
         if (bounds.isValid()) _map.fitBounds(bounds.pad(0.15));
@@ -2836,6 +2916,25 @@ async function geocodeMapAddresses() {
   mapUpdateSubtitle();
   subtitle.textContent += ' — done';
 }
+
+function toggleMapFullscreen() {
+  const content = document.getElementById('mapModalContent');
+  if (!document.fullscreenElement) {
+    content.requestFullscreen().catch(err => console.warn('Fullscreen error:', err));
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (_map) setTimeout(() => _map.invalidateSize(), 100);
+  const btn = document.getElementById('mapFullscreenBtn');
+  if (!btn) return;
+  const isFs = !!document.fullscreenElement;
+  btn.title = isFs ? 'Exit fullscreen' : 'Fullscreen';
+  btn.querySelector('.fs-icon-expand').classList.toggle('hidden', isFs);
+  btn.querySelector('.fs-icon-contract').classList.toggle('hidden', !isFs);
+});
 
 // ── FSG Stats Modal ───────────────────────────────────────────────────────────
 let _fsgChart = null;
