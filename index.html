@@ -1477,7 +1477,8 @@ function loadSelectOptions() {
     ['fsgFilterDesktop','fsgFilterMobile'].forEach(id => {
       const el = document.getElementById(id); if (!el) return;
       el.innerHTML = '<option value="">All Groups</option>' +
-        fsgOpts.map(v => `<option value="${h(v)}"${v===fsgFilter?' selected':''}>${h(v)}</option>`).join('');
+        fsgOpts.map(v => `<option value="${h(v)}"${v===fsgFilter?' selected':''}>${h(v)}</option>`).join('') +
+        `<option value="Unassigned"${'Unassigned'===fsgFilter?' selected':''}>Unassigned</option>`;
     });
     ['familyFilterDesktop','familyFilterMobile'].forEach(id => {
       const el = document.getElementById(id); if (!el) return;
