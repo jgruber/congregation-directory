@@ -1627,7 +1627,7 @@ function renderCard(p) {
   if (p.special_pioneer)   badges += badgePill('appointment','Sp.Pioneer');
   else if (p.pioneer)       badges += badgePill('appointment','Pioneer');
   else if (p.regular_auxiliary) badges += badgePill('appointment','Aux.Pio.');
-  if (p.inactive) badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Inactive</span>`;
+  if (p.inactive && p.category !== 'associated') badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Inactive</span>`;
   if (p.moved)    badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">Moved</span>`;
   if (p.child)    badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">Child</span>`;
   if (p.removed)  badges += `<span class="inline-flex px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Removed</span>`;
@@ -2865,7 +2865,7 @@ function renderFsgStatsChart() {
     if (p.ministerial_servant)                 g.ms++;
     if (p.special_pioneer || p.pioneer)        g.pioneers++;
     if (!p.inactive && !p.moved && !p.removed) g.active++;
-    if (p.inactive)                            g.inactive++;
+    if (p.inactive && p.category !== 'associated') g.inactive++;
   }
 
   // Named groups alphabetically, Unassigned last
