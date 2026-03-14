@@ -2789,7 +2789,7 @@ function mapAddFamilyMarker(fam) {
     const ageStr = age !== null ? `<span style="color:#9ca3af;font-size:0.75em">${age}</span>` : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0">
       <span style="display:flex;align-items:center;gap:4px">
-        <a href="javascript:void(0)" onclick="openPersonDetail(${p.id})"
+        <a href="javascript:void(0)" onclick="mapOpenPerson(${p.id})"
            style="color:#2563eb;text-decoration:underline;white-space:nowrap">${h(p.display_name)}</a>
         ${ageStr}
       </span>
@@ -2926,11 +2926,32 @@ function toggleMapFullscreen() {
   }
 }
 
+// Open person detail, exiting fullscreen first if active (personModal is outside
+// the fullscreen element and cannot render above it while fullscreen is active).
+function mapOpenPerson(id) {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().then(() => setTimeout(() => openPersonDetail(id), 50));
+  } else {
+    openPersonDetail(id);
+  }
+}
+
 document.addEventListener('fullscreenchange', () => {
-  if (_map) setTimeout(() => _map.invalidateSize(), 100);
+  const isFs = !!document.fullscreenElement;
+  if (_map) {
+    setTimeout(() => {
+      _map.invalidateSize();
+      if (!isFs) {
+        // Reset Leaflet drag state — leaving fullscreen can leave pointer events locked
+        _map.dragging.disable();
+        _map.dragging.enable();
+        // Restore window focus so the page responds to input immediately
+        window.focus();
+      }
+    }, 150);
+  }
   const btn = document.getElementById('mapFullscreenBtn');
   if (!btn) return;
-  const isFs = !!document.fullscreenElement;
   btn.title = isFs ? 'Exit fullscreen' : 'Fullscreen';
   btn.querySelector('.fs-icon-expand').classList.toggle('hidden', isFs);
   btn.querySelector('.fs-icon-contract').classList.toggle('hidden', !isFs);
