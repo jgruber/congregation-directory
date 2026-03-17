@@ -556,6 +556,19 @@
           <p class="text-sm font-medium mb-2">Theme Color</p>
           <div id="themeColorPicker" class="flex flex-wrap gap-3"></div>
         </div>
+
+        <!-- Search behaviour -->
+        <div class="mt-5 space-y-3">
+          <p class="text-sm font-medium">Search Behaviour</p>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" id="clearSearchOnTagAdd" class="w-4 h-4 rounded accent-[var(--p)]">
+            <span class="text-sm">Clear search text when tags added</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" id="clearSearchOnTagRemove" class="w-4 h-4 rounded accent-[var(--p)]">
+            <span class="text-sm">Clear search text when tags removed</span>
+          </label>
+        </div>
       </section>
 
       <!-- ── About ── -->
@@ -697,13 +710,15 @@ let editMode      = false;
 let selectedPids  = new Set();
 
 let settings = {
-  csvUrl:           '',
-  csvUsername:      '',
-  csvPassword:      '',
-  autoSyncInterval: 0,
-  darkMode:         window.matchMedia('(prefers-color-scheme: dark)').matches,
-  theme:            'blue',
-  lastSync:         null,
+  csvUrl:               '',
+  csvUsername:          '',
+  csvPassword:          '',
+  autoSyncInterval:     0,
+  darkMode:             window.matchMedia('(prefers-color-scheme: dark)').matches,
+  theme:                'blue',
+  lastSync:             null,
+  clearSearchOnTagAdd:  true,
+  clearSearchOnTagRemove: false,
 };
 
 /* ─────────────────────────────────────────
@@ -1880,13 +1895,21 @@ function renderActiveFilters() {
 /* ─────────────────────────────────────────
    INTERACTIONS
 ───────────────────────────────────────── */
+function clearSearchInput() {
+  searchText = '';
+  const el = document.getElementById('searchInput');
+  if (el) el.value = '';
+}
+
 function toggleTagFilter(tagName, tagType) {
   // In the tag panel: first click = include, second click = remove (skip exclude)
   const idx = activeFilters.findIndex(f => f.name === tagName && f.tagType === tagType);
   if (idx === -1) {
     activeFilters.push({ id: Date.now(), name: tagName, tagType, mode: 'include' });
+    if (settings.clearSearchOnTagAdd) clearSearchInput();
   } else {
     activeFilters.splice(idx, 1);
+    if (settings.clearSearchOnTagRemove) clearSearchInput();
   }
   renderActiveFilters();
   renderTagPanel('tagPanelDesktop');
@@ -1906,7 +1929,10 @@ function negateTagFilter(tagName, tagType) {
 
 function removeTagFilter(tagName, tagType) {
   const idx = activeFilters.findIndex(f => f.name === tagName && f.tagType === tagType);
-  if (idx !== -1) activeFilters.splice(idx, 1);
+  if (idx !== -1) {
+    activeFilters.splice(idx, 1);
+    if (settings.clearSearchOnTagRemove) clearSearchInput();
+  }
   renderActiveFilters();
   renderTagPanel('tagPanelDesktop');
   renderTagPanel('tagPanelMobile');
@@ -2384,6 +2410,8 @@ function openSettings() {
     ? `Last synced: ${new Date(settings.lastSync).toLocaleString()}` : '';
   document.getElementById('customTagImportStatus').textContent = '';
   renderCustomTagList();
+  document.getElementById('clearSearchOnTagAdd').checked    = !!settings.clearSearchOnTagAdd;
+  document.getElementById('clearSearchOnTagRemove').checked = !!settings.clearSearchOnTagRemove;
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 
@@ -2391,7 +2419,9 @@ function closeSettings() {
   settings.csvUrl          = document.getElementById('csvUrlInput').value.trim();
   settings.csvUsername     = document.getElementById('csvUsernameInput').value.trim();
   settings.csvPassword     = document.getElementById('csvPasswordInput').value;
-  settings.autoSyncInterval = parseInt(document.getElementById('autoSyncInterval').value) || 0;
+  settings.autoSyncInterval      = parseInt(document.getElementById('autoSyncInterval').value) || 0;
+  settings.clearSearchOnTagAdd    = document.getElementById('clearSearchOnTagAdd').checked;
+  settings.clearSearchOnTagRemove = document.getElementById('clearSearchOnTagRemove').checked;
   saveSettings();
   setupAutoSync();
   document.getElementById('settingsModal').classList.add('hidden');
