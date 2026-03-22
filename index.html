@@ -585,6 +585,19 @@
           <div id="themeColorPicker" class="flex flex-wrap gap-3"></div>
         </div>
 
+        <!-- WhatsApp -->
+        <div class="mt-5">
+          <p class="text-sm font-medium mb-2">WhatsApp</p>
+          <label class="text-sm text-gray-500 dark:text-gray-400 block mb-1">Default country code</label>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-400">+</span>
+            <input type="text" id="countryCodeInput" placeholder="e.g. 1 for US"
+              class="w-40 px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Prepended to numbers that don't start with +</p>
+        </div>
+
         <!-- Search behaviour -->
         <div class="mt-5 space-y-3">
           <p class="text-sm font-medium">Search Behaviour</p>
@@ -747,6 +760,7 @@ let settings = {
   lastSync:             null,
   clearSearchOnTagAdd:  true,
   clearSearchOnTagRemove: false,
+  countryCode:          '',
 };
 
 /* ─────────────────────────────────────────
@@ -1644,7 +1658,10 @@ function calcAge(dob) {
 }
 
 function waUrl(phone) {
-  return `https://wa.me/${phone.replace(/\D/g, '')}`;
+  const digits = phone.trim().startsWith('+')
+    ? phone.replace(/\D/g, '')
+    : (settings.countryCode || '') + phone.replace(/\D/g, '');
+  return `https://wa.me/${digits}`;
 }
 
 function renderCard(p) {
@@ -2472,6 +2489,7 @@ function openSettings() {
   renderCustomTagList();
   document.getElementById('clearSearchOnTagAdd').checked    = !!settings.clearSearchOnTagAdd;
   document.getElementById('clearSearchOnTagRemove').checked = !!settings.clearSearchOnTagRemove;
+  document.getElementById('countryCodeInput').value         = settings.countryCode || '';
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 
@@ -2482,6 +2500,7 @@ function closeSettings() {
   settings.autoSyncInterval      = parseInt(document.getElementById('autoSyncInterval').value) || 0;
   settings.clearSearchOnTagAdd    = document.getElementById('clearSearchOnTagAdd').checked;
   settings.clearSearchOnTagRemove = document.getElementById('clearSearchOnTagRemove').checked;
+  settings.countryCode            = document.getElementById('countryCodeInput').value.replace(/\D/g, '');
   saveSettings();
   setupAutoSync();
   document.getElementById('settingsModal').classList.add('hidden');
