@@ -770,6 +770,7 @@ function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     Object.assign(settings, s);
+    if (!settings.countryCode) settings.countryCode = '1';
   } catch(_) {}
 }
 
