@@ -2308,6 +2308,14 @@ function renderCustomTagList() {
             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
         </svg>
       </button>
+      ${(settings.csvUrl && settings.csvUsername && settings.csvPassword) ? `
+      <button onclick="uploadCustomTag(${idx})" title="Upload tag to server"
+        class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/>
+        </svg>
+      </button>` : ''}
       <button onclick="deleteCustomTag(${idx})" title="Delete tag"
         class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 transition-colors">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2324,6 +2332,57 @@ function exportCustomTag(idx) {
   const payload = { version: 1, tagName: t.name, assignments: t.assignments };
   const safe = t.name.replace(/[^a-z0-9]/gi, '_');
   triggerDownload(JSON.stringify(payload, null, 2), `tag_${safe}.json`, 'application/json');
+}
+
+async function uploadCustomTag(idx) {
+  const tags = loadCustomTags();
+  const t = tags[idx];
+  if (!t) return;
+
+  const baseUrl = settings.csvUrl && settings.csvUrl.trim();
+  const username = settings.csvUsername && settings.csvUsername.trim();
+  const password = settings.csvPassword;
+  if (!baseUrl || !username || !password) {
+    toast('Auto-Fetch URL and credentials must be configured in Settings');
+    return;
+  }
+
+  let uploadUrl;
+  try {
+    const parsed = new URL(baseUrl);
+    parsed.pathname = '/upload/tags';
+    parsed.search = '';
+    uploadUrl = parsed.toString();
+  } catch {
+    toast('Auto-Fetch URL is not a valid URL');
+    return;
+  }
+
+  const payload = { version: 1, tagName: t.name, assignments: t.assignments };
+  const safe = t.name.replace(/[^a-z0-9]/gi, '_');
+  const filename = `tag_${safe}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+
+  const formData = new FormData();
+  formData.append('files', blob, filename);
+
+  const creds = btoa(`${username}:${password}`);
+  try {
+    const resp = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${creds}` },
+      body: formData,
+    });
+    if (resp.ok) {
+      const json = await resp.json().catch(() => ({}));
+      toast(json.message || `Tag "${t.name}" uploaded successfully`);
+    } else {
+      const json = await resp.json().catch(() => ({}));
+      toast(`Upload failed (${resp.status}): ${json.detail || resp.statusText}`);
+    }
+  } catch (err) {
+    toast(`Upload error: ${err.message}`);
+  }
 }
 
 async function deleteCustomTag(idx) {
