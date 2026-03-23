@@ -3038,7 +3038,31 @@ function mapUpdateSubtitle() {
 
 function renderMap() {
   if (_map) { _map.remove(); _map = null; _markerGroup = null; }
-  _familyGroups = buildFamilyGroups(currentPersons);
+
+  // Collect the family keys present in the filtered result set
+  const filteredKeys = new Set(currentPersons.map(p =>
+    p.family_id ? `fid_${p.family_id}` : p.family_name ? `fn_${p.family_name}` : `solo_${p.id}`
+  ));
+
+  // Build family groups from ALL persons so that coordinates stored on any
+  // family member (e.g. a spouse) are found even when the filter only matched
+  // the family head.  Keep only families represented in the filtered results.
+  let familyPersons = currentPersons;
+  if (db && filteredKeys.size > 0) {
+    try {
+      const res = db.exec('SELECT * FROM persons');
+      if (res.length) {
+        const cols = res[0].columns;
+        familyPersons = res[0].values
+          .map(row => { const o = {}; cols.forEach((c, i) => o[c] = row[i]); return o; })
+          .filter(p => filteredKeys.has(
+            p.family_id ? `fid_${p.family_id}` : p.family_name ? `fn_${p.family_name}` : `solo_${p.id}`
+          ));
+      }
+    } catch (e) { /* fall back to currentPersons */ }
+  }
+
+  _familyGroups = buildFamilyGroups(familyPersons);
 
   const mapEl = document.getElementById('mapContainer');
   _map = L.map(mapEl);
