@@ -22,6 +22,7 @@
           crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
   <style>
     /* Theme CSS variables */
     :root                { --p:#3b82f6; --ph:#2563eb; --pl:#eff6ff; --pr:#93c5fd; }
@@ -493,7 +494,17 @@
 
         <!-- URL fetch -->
         <div class="space-y-3">
-          <label class="block text-sm font-medium">Auto-Fetch from URL <span class="text-xs text-gray-400 font-normal">(with BASIC auth)</span></label>
+          <div class="flex items-center gap-2">
+            <label class="block text-sm font-medium">Auto-Fetch from URL <span class="text-xs text-gray-400 font-normal">(with BASIC auth)</span></label>
+            <button id="scanQrBtn" title="Scan QR code"
+              class="p-1 rounded text-gray-500 dark:text-gray-400 hover:text-[var(--p)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2
+                     M7 8h2v2H7zM7 14h2v2H7zM13 8h2v2h-2zM13 14h2v2h-2z"/>
+              </svg>
+            </button>
+          </div>
           <input type="url" id="csvUrlInput" placeholder="https://your-server.example"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg
                    bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]" />
@@ -3254,6 +3265,131 @@ function renderStatsCharts() {
     }
   });
 }
+
+/* ── QR Code Scanner ──────────────────────────────────────────────────────── */
+(function () {
+  let stream = null;
+  let rafId  = null;
+
+  function openQrScanner() {
+    const modal = document.getElementById('qrScanModal');
+    modal.classList.remove('hidden');
+    document.getElementById('qrScanStatus').textContent = 'Starting camera…';
+    startCamera();
+  }
+
+  function closeQrScanner() {
+    stopCamera();
+    document.getElementById('qrScanModal').classList.add('hidden');
+  }
+
+  function stopCamera() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    const video = document.getElementById('qrVideo');
+    video.srcObject = null;
+  }
+
+  async function startCamera() {
+    const video  = document.getElementById('qrVideo');
+    const status = document.getElementById('qrScanStatus');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }
+      });
+      video.srcObject = stream;
+      await video.play();
+      status.textContent = 'Point your camera at a QR code';
+      scanFrame();
+    } catch (err) {
+      status.textContent = 'Camera access denied or unavailable.';
+    }
+  }
+
+  function scanFrame() {
+    const video  = document.getElementById('qrVideo');
+    const canvas = document.getElementById('qrCanvas');
+    if (!stream || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafId = requestAnimationFrame(scanFrame);
+      return;
+    }
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+    if (code) {
+      handleQrResult(code.data);
+    } else {
+      rafId = requestAnimationFrame(scanFrame);
+    }
+  }
+
+  function handleQrResult(raw) {
+    const status = document.getElementById('qrScanStatus');
+    try {
+      const json = JSON.parse(atob(raw));
+      if (!json.url) throw new Error('Missing url');
+      document.getElementById('csvUrlInput').value      = json.url      || '';
+      document.getElementById('csvUsernameInput').value = json.username || '';
+      document.getElementById('csvPasswordInput').value = json.password || '';
+      closeQrScanner();
+      toast('QR code scanned — credentials populated');
+    } catch (e) {
+      status.textContent = 'Invalid QR code. Expected base64-encoded JSON with url, username, password.';
+      // keep scanning after a brief pause
+      setTimeout(() => {
+        if (stream) {
+          status.textContent = 'Point your camera at a QR code';
+          rafId = requestAnimationFrame(scanFrame);
+        }
+      }, 2000);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('scanQrBtn').addEventListener('click', openQrScanner);
+    document.getElementById('qrScanClose').addEventListener('click', closeQrScanner);
+    document.getElementById('qrScanBackdrop').addEventListener('click', closeQrScanner);
+  });
+})();
 </script>
+
+<!-- QR Scanner Modal -->
+<div id="qrScanModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+  <div class="absolute inset-0 bg-black/70" id="qrScanBackdrop"></div>
+  <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-sm mx-4 flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-base font-semibold">Scan QR Code</h3>
+      <button id="qrScanClose" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="relative rounded-lg overflow-hidden bg-black aspect-square">
+      <video id="qrVideo" class="w-full h-full object-cover" playsinline muted></video>
+      <canvas id="qrCanvas" class="hidden"></canvas>
+      <!-- scan line animation -->
+      <div class="absolute inset-0 pointer-events-none">
+        <div id="qrScanLine" class="absolute left-4 right-4 h-0.5 bg-[var(--p)] opacity-80 shadow-[0_0_6px_2px_var(--pr)]" style="top:30%;animation:qrScanAnim 2s linear infinite"></div>
+        <!-- corner marks -->
+        <div class="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-[var(--p)] rounded-tl"></div>
+        <div class="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-[var(--p)] rounded-tr"></div>
+        <div class="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-[var(--p)] rounded-bl"></div>
+        <div class="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-[var(--p)] rounded-br"></div>
+      </div>
+    </div>
+    <p id="qrScanStatus" class="text-xs text-center text-gray-500 dark:text-gray-400">Point your camera at a QR code</p>
+  </div>
+</div>
+<style>
+  @keyframes qrScanAnim {
+    0%   { top: 15%; }
+    50%  { top: 80%; }
+    100% { top: 15%; }
+  }
+</style>
 </body>
 </html>
