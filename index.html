@@ -3145,6 +3145,16 @@ async function geocodeMapAddresses() {
       if (data.length) {
         const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
         _geocodeCache[addr] = { lat, lng };
+        // Persist coords to DB so they survive page reloads and filter changes
+        if (db) {
+          try {
+            db.run(
+              `UPDATE persons SET latitude=?, longitude=? WHERE full_address=?`,
+              [lat, lng, addr]
+            );
+            await persistDb();
+          } catch(e) { console.warn('Failed to persist geocode to DB:', e); }
+        }
         for (const fam of famList) {
           fam.latitude = lat; fam.longitude = lng;
           mapAddFamilyMarker(fam);
