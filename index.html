@@ -652,7 +652,7 @@
       class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
   </div>
   <div class="flex items-center gap-2">
-    <input id="editTagNameInput" type="text" maxlength="60" placeholder="Tag name…"
+    <input id="editTagNameInput" type="text" maxlength="60" placeholder="New or replace tag name…"
       list="editTagNameSuggestions"
       class="flex-1 min-w-0 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700
              rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]"/>
@@ -660,6 +660,17 @@
     <button id="editApplyTagBtn" disabled
       class="px-4 py-1.5 rounded-lg text-sm font-medium text-white btn-primary disabled:opacity-40 transition-colors">
       Apply Tag
+    </button>
+  </div>
+  <div class="flex items-center gap-2">
+    <select id="editAddToTagSelect"
+      class="flex-1 min-w-0 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700
+             rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)]">
+      <option value="">— add to existing tag —</option>
+    </select>
+    <button id="editAddToExistingBtn" disabled
+      class="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 transition-colors">
+      Add to Tag
     </button>
   </div>
 </div>
@@ -2180,6 +2191,7 @@ function exitEditMode() {
   btn.classList.add('text-gray-500','dark:text-gray-400');
   document.getElementById('editActionBar').classList.add('hidden');
   document.getElementById('editTagNameInput').value = '';
+  document.getElementById('editAddToTagSelect').value = '';
   renderResults();
 }
 
@@ -2188,6 +2200,8 @@ function updateEditActionBar() {
   document.getElementById('editSelCount').textContent = `${count} selected`;
   const tagName = document.getElementById('editTagNameInput').value.trim();
   document.getElementById('editApplyTagBtn').disabled = !(count > 0 && tagName.length > 0);
+  const selTag = document.getElementById('editAddToTagSelect').value;
+  document.getElementById('editAddToExistingBtn').disabled = !(count > 0 && selTag.length > 0);
 }
 
 function toggleCardSelection(pid) {
@@ -2208,10 +2222,17 @@ function selectAllCards() {
 }
 
 function syncTagNameSuggestions() {
-  const dl = document.getElementById('editTagNameSuggestions');
-  if (!dl) return;
+  const dl  = document.getElementById('editTagNameSuggestions');
+  const sel = document.getElementById('editAddToTagSelect');
   const tags = loadCustomTags();
-  dl.innerHTML = tags.map(t => `<option value="${h(t.name)}"></option>`).join('');
+  if (dl) dl.innerHTML = tags.map(t => `<option value="${h(t.name)}"></option>`).join('');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— add to existing tag —</option>' +
+      tags.map(t => `<option value="${h(t.name)}">${h(t.name)}</option>`).join('');
+    if (prev && tags.some(t => t.name === prev)) sel.value = prev;
+  }
+  updateEditActionBar();
 }
 
 async function applyEditTag() {
@@ -2234,6 +2255,34 @@ async function applyEditTag() {
   renderTagPanel('tagPanelDesktop');
   renderTagPanel('tagPanelMobile');
   toast(`Tag "${tagName}" applied to ${selectedPids.size} person(s)`);
+  exitEditMode();
+}
+
+async function addToExistingTag() {
+  const tagName = document.getElementById('editAddToTagSelect').value;
+  if (!tagName || selectedPids.size === 0) return;
+
+  const customTags = loadCustomTags();
+  const entry = customTags.find(t => t.name === tagName);
+  if (!entry) return;
+
+  const existingIds = new Set(entry.assignments.map(a => a.personId));
+  let added = 0;
+  for (const pid of selectedPids) {
+    if (!existingIds.has(pid)) {
+      entry.assignments.push({ personId: pid });
+      added++;
+    }
+  }
+
+  saveCustomTags(customTags);
+  applyCustomTags();
+  await persistDb();
+  loadAvailTags();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  const skipped = selectedPids.size - added;
+  toast(`Added ${added} person(s) to "${tagName}"${skipped ? ` (${skipped} already in tag)` : ''}`);
   exitEditMode();
 }
 
@@ -2774,6 +2823,8 @@ async function init() {
   document.getElementById('editCancelBtn').addEventListener('click', exitEditMode);
   document.getElementById('editTagNameInput').addEventListener('input', updateEditActionBar);
   document.getElementById('editApplyTagBtn').addEventListener('click', applyEditTag);
+  document.getElementById('editAddToTagSelect').addEventListener('change', updateEditActionBar);
+  document.getElementById('editAddToExistingBtn').addEventListener('click', addToExistingTag);
 
   // Custom tag import
   document.getElementById('customTagImportInput').addEventListener('change', e => {
