@@ -2911,7 +2911,7 @@ function mapAddFamilyMarker(fam) {
   const popup = `<div style="min-width:180px">
     <b>${h(fam.name)}</b>
     ${fam.field_service_group_name ? `<div style="color:#6b7280;font-size:0.8em">${h(fam.field_service_group_name)}</div>` : ''}
-    ${fam.full_address ? `<div style="color:#6b7280;font-size:0.75em">${h(fam.full_address)}</div>` : ''}
+    ${fam.full_address ? `<div style="font-size:0.75em"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fam.full_address)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:underline">${h(fam.full_address)}</a></div>` : ''}
     <div style="margin-top:6px;border-top:1px solid #e5e7eb;padding-top:6px">${memberRows}</div>
   </div>`;
   L.marker([fam.latitude, fam.longitude], { icon: mapMakeIcon(color) })
