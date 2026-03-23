@@ -3143,6 +3143,17 @@ function renderFsgStatsChart() {
     </tr>`;
   }).join('');
 
+  const totals = labels.reduce((acc, l) => {
+    const g = groupMap[l];
+    acc.elders   += g.elders   || 0;
+    acc.ms       += g.ms       || 0;
+    acc.pioneers += g.pioneers || 0;
+    acc.active   += g.active   || 0;
+    acc.inactive += g.inactive || 0;
+    acc.total    += g.total    || 0;
+    return acc;
+  }, { elders: 0, ms: 0, pioneers: 0, active: 0, inactive: 0, total: 0 });
+
   document.getElementById('statsFsgTable').innerHTML = `
     <table class="w-full text-xs">
       <thead>
@@ -3157,6 +3168,17 @@ function renderFsgStatsChart() {
         </tr>
       </thead>
       <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="border-t-2 ${borderCls} font-semibold">
+          <td class="pt-1.5 pr-3 text-gray-700 dark:text-gray-300">Totals</td>
+          <td class="pt-1.5 px-2 text-center text-purple-600 dark:text-purple-400">${totals.elders || '—'}</td>
+          <td class="pt-1.5 px-2 text-center text-blue-600 dark:text-blue-400">${totals.ms || '—'}</td>
+          <td class="pt-1.5 px-2 text-center text-emerald-600 dark:text-emerald-400">${totals.pioneers || '—'}</td>
+          <td class="pt-1.5 px-2 text-center text-amber-600 dark:text-amber-400">${totals.active}</td>
+          <td class="pt-1.5 px-2 text-center text-red-600 dark:text-red-400">${totals.inactive || '—'}</td>
+          <td class="pt-1.5 pl-2 text-center text-gray-500 dark:text-gray-400">${totals.total}</td>
+        </tr>
+      </tfoot>
     </table>`;
 }
 
