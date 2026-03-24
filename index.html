@@ -1214,6 +1214,8 @@ function parseAddress(raw) {
   const stRe = new RegExp(`\\b(${STREET_TYPES})\\b`, 'gi');
   let lastEnd = -1, m;
   while ((m = stRe.exec(s)) !== null) lastEnd = m.index + m[0].length;
+  // Skip trailing period from abbreviated street types (Dr., Pkwy., etc.)
+  if (lastEnd > 0 && s[lastEnd] === '.') lastEnd++;
 
   if (lastEnd > 0) {
     // After last street type, consume optional unit designator (Apt 5, Suite 200, #3B, etc.)
