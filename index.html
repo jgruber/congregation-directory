@@ -1217,7 +1217,7 @@ function parseAddress(raw) {
 
   if (lastEnd > 0) {
     // After last street type, consume optional unit designator (Apt 5, Suite 200, #3B, etc.)
-    const unitM = s.slice(lastEnd).match(/^[\s,]*(apt\.?|apartment|suite|ste\.?|unit|#)\s*[\w-]*/i);
+    const unitM = s.slice(lastEnd).match(/^[\s,]*(apt\.?|apartment|suite|ste\.?|unit|#\.?)\s*#?\s*[\w-]*/i);
     if (unitM) lastEnd += unitM[0].length;
     // Skip trailing whitespace/commas before city
     while (lastEnd < s.length && /[\s,]/.test(s[lastEnd])) lastEnd++;
