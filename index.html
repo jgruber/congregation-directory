@@ -1146,18 +1146,88 @@ function parseCSV(raw) {
 ───────────────────────────────────────── */
 function parseAddress(raw) {
   if (!raw || !raw.trim()) return { address:'', city:'', state:'', postal_code:'' };
-  const cleaned = raw.replace(/[\r\n]+/g,' ').replace(/\s{2,}/g,' ').trim();
-  // Pattern: "... City ST 12345" or "... City, ST 12345"
-  const m = cleaned.match(/^(.*?),?\s+([A-Za-z][A-Za-z\s\.]+?)\s{1,3}([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-  if (m) {
+
+  // Normalize whitespace and strip trailing punctuation/commas
+  let s = raw.replace(/[\r\n]+/g,' ').replace(/\s{2,}/g,' ').trim().replace(/[,.\s]+$/, '');
+
+  // Full US state name → 2-letter abbreviation (handles "Texas", "New York", etc.)
+  const STATE_NAMES = {
+    'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA',
+    'colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA',
+    'hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA',
+    'kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD',
+    'massachusetts':'MA','michigan':'MI','minnesota':'MN','mississippi':'MS',
+    'missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV',
+    'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
+    'north carolina':'NC','north dakota':'ND','ohio':'OH','oklahoma':'OK',
+    'oregon':'OR','pennsylvania':'PA','rhode island':'RI','south carolina':'SC',
+    'south dakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT',
+    'virginia':'VA','washington':'WA','west virginia':'WV','wisconsin':'WI',
+    'wyoming':'WY','district of columbia':'DC',
+  };
+  // Multi-word states first, then single-word (order matters)
+  const stateEntries = Object.entries(STATE_NAMES).sort((a,b) => b[0].split(' ').length - a[0].split(' ').length);
+  for (const [name, abbr] of stateEntries) {
+    s = s.replace(new RegExp(`\\b${name}\\b`, 'i'), abbr);
+  }
+
+  // 1. Extract ZIP from end (5-digit, optionally with +4)
+  const zipM = s.match(/\b(\d{5}(?:-\d{4})?)\s*$/);
+  if (!zipM) return { address: s, city:'', state:'', postal_code:'' };
+  const postal_code = zipM[1];
+  s = s.slice(0, zipM.index).trim().replace(/[,\s]+$/, '');
+
+  // 2. Extract 2-letter state from end
+  const stateM = s.match(/,?\s+([A-Z]{2})$/);
+  if (!stateM) return { address: s, city:'', state:'', postal_code };
+  const state = stateM[1];
+  s = s.slice(0, s.length - stateM[0].length).trim();
+
+  // 3. Expand cardinal direction abbreviations (W→West, N→North, etc.)
+  //    Applied after state extraction so state codes are already gone
+  const COMPASS = { ne:'Northeast', nw:'Northwest', se:'Southeast', sw:'Southwest',
+                    n:'North', s:'South', e:'East', w:'West' };
+  s = s.replace(/\b(NE|NW|SE|SW)\b/gi, m => COMPASS[m.toLowerCase()]);
+  s = s.replace(/\b([NSEW])\b/gi, m => COMPASS[m.toLowerCase()]);
+
+  // 4. If a comma separates address from city, split on the LAST comma
+  const commaIdx = s.lastIndexOf(',');
+  if (commaIdx > 0) {
     return {
-      address:     m[1].trim(),
-      city:        m[2].trim(),
-      state:       m[3].trim(),
-      postal_code: m[4].trim(),
+      address:     s.slice(0, commaIdx).trim(),
+      city:        s.slice(commaIdx + 1).trim(),
+      state, postal_code,
     };
   }
-  return { address: cleaned, city:'', state:'', postal_code:'' };
+
+  // 5. No comma: scan for last street-type keyword and split city from address after it
+  const STREET_TYPES = [
+    'street','avenue','boulevard','drive','road','lane','court','place','circle',
+    'way','parkway','highway','freeway','expressway','terrace','trail','loop',
+    'pass','path','pike','row','square','crossing','park','run','hollow','ridge',
+    'heights','commons','manor','grove','bend','cove','falls','valley','plaza',
+    'bridge','estates','summit','landing','springs','canyon','point','pointe',
+    // abbreviations
+    'st','ave','blvd','dr','rd','ln','ct','pl','cir','pkwy','hwy','fwy','expy',
+    'ter','trl','sq','xing','ste',
+  ].join('|');
+  const stRe = new RegExp(`\\b(${STREET_TYPES})\\b`, 'gi');
+  let lastEnd = -1, m;
+  while ((m = stRe.exec(s)) !== null) lastEnd = m.index + m[0].length;
+
+  if (lastEnd > 0) {
+    // After last street type, consume optional unit designator (Apt 5, Suite 200, #3B, etc.)
+    const unitM = s.slice(lastEnd).match(/^[\s,]*(apt\.?|apartment|suite|ste\.?|unit|#)\s*[\w-]*/i);
+    if (unitM) lastEnd += unitM[0].length;
+    // Skip trailing whitespace/commas before city
+    while (lastEnd < s.length && /[\s,]/.test(s[lastEnd])) lastEnd++;
+    const address = s.slice(0, lastEnd).trimEnd().replace(/[,\s]+$/, '');
+    const city    = s.slice(lastEnd).trim();
+    if (city) return { address, city, state, postal_code };
+  }
+
+  // Fallback: couldn't isolate city
+  return { address: s, city:'', state, postal_code };
 }
 
 /* ─────────────────────────────────────────
