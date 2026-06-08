@@ -630,6 +630,12 @@
             Import Tag File
             <input type="file" id="customTagImportInput" accept=".json" multiple class="hidden"/>
           </label>
+          <button id="exportAllTagsBtn" type="button"
+                  class="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer
+                         bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200
+                         hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+            Export All Tags
+          </button>
           <span id="customTagImportStatus" class="text-xs text-gray-500 dark:text-gray-400"></span>
         </div>
       </section>
@@ -2497,6 +2503,15 @@ function exportCustomTag(idx) {
   triggerDownload(JSON.stringify(payload, null, 2), `tag_${safe}.json`, 'application/json');
 }
 
+// Export every custom tag as one bundled-array file (the shape importCustomTagFile accepts).
+function exportAllCustomTags() {
+  const tags = loadCustomTags();
+  if (!tags.length) { toast('No custom tags to export'); return; }
+  const payload = tags.map(t => ({ version: 1, tagName: t.name, assignments: t.assignments }));
+  triggerDownload(JSON.stringify(payload, null, 2), 'tags_exported.json', 'application/json');
+  toast(`Exported ${tags.length} tag${tags.length === 1 ? '' : 's'}`);
+}
+
 async function uploadCustomTag(idx) {
   const tags = loadCustomTags();
   const t = tags[idx];
@@ -2596,21 +2611,31 @@ async function importCustomTagFile(file) {
   const statusEl = document.getElementById('customTagImportStatus');
   try {
     const text = await file.text();
-    const data = JSON.parse(text);
-    const applied = applyTagData(data, false);
-    if (!applied) {
+    const parsed = JSON.parse(text);
+    // Accept either a single tag object or an array of tag objects (a bundled export).
+    const tagList = Array.isArray(parsed) ? parsed : [parsed];
+    if (!tagList.length) throw new Error('No tags in file');
+
+    const importedNames = [];
+    let cancelled = 0;
+    for (const data of tagList) {
+      if (applyTagData(data, false)) importedNames.push(data.tagName);
+      else cancelled++;
+    }
+    if (!importedNames.length) {
       if (statusEl) statusEl.textContent = 'Import cancelled.';
       return;
     }
-    const count = data.assignments.filter(a => typeof a.personId === 'number').length;
+
     applyCustomTags();
     await persistDb();
     loadAvailTags();
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
     renderCustomTagList();
-    if (statusEl) statusEl.textContent = `✓ Imported "${data.tagName}" (${count} assignments)`;
-    toast(`Imported tag "${data.tagName}"`);
+    const label = importedNames.length === 1 ? `"${importedNames[0]}"` : `${importedNames.length} tags`;
+    if (statusEl) statusEl.textContent = `✓ Imported ${label}` + (cancelled ? ` (${cancelled} skipped)` : '');
+    toast(`Imported ${label}`);
   } catch(e) {
     if (statusEl) statusEl.textContent = `✗ ${e.message}`;
     toast(`Import failed: ${e.message}`);
@@ -3077,6 +3102,7 @@ async function init() {
     for (const file of e.target.files) importCustomTagFile(file);
     e.target.value = '';
   });
+  document.getElementById('exportAllTagsBtn').addEventListener('click', exportAllCustomTags);
 }
 
 // Expose globally for inline onclick handlers
