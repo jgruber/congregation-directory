@@ -2614,6 +2614,19 @@ function buildPersonLookup() {
   return { validPids, nameToId };
 }
 
+// Collect tag objects from whatever shape a tag source returns: a single tag
+// object, a flat array of them, or an array that contains bundled arrays (e.g.
+// a multi-tag export stored as one file on the sync server). Flattens any
+// nesting and keeps only plain objects, so every bundled tag gets imported.
+function flattenTagData(data) {
+  const out = [];
+  (function walk(node) {
+    if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') out.push(node);
+  })(data);
+  return out;
+}
+
 // Returns false if the user cancels a replace; otherwise a result object
 // describing how many assignments actually attach to the current directory.
 function applyTagData(data, autoReplace = false) {
@@ -2661,8 +2674,8 @@ async function importCustomTagFile(file) {
   try {
     const text = await file.text();
     const parsed = JSON.parse(text);
-    // Accept either a single tag object or an array of tag objects (a bundled export).
-    const tagList = Array.isArray(parsed) ? parsed : [parsed];
+    // Accept a single tag object, an array of them, or nested/bundled arrays.
+    const tagList = flattenTagData(parsed);
     if (!tagList.length) throw new Error('No tags in file');
 
     const results = [];
@@ -2788,16 +2801,15 @@ async function fetchCSVFromURL(statusElId) {
       if (statusEl) statusEl.textContent = '⏳ Fetching tags…';
       const tagsRes = await fetch(tagsUrl, { headers });
       if (tagsRes.ok) {
-        const tagList = await tagsRes.json();
-        if (Array.isArray(tagList)) {
-          for (const tagData of tagList) {
-            try { if (applyTagData(tagData, true)) tagsImported++; }
-            catch(e) { console.warn('[Tags] Skipping invalid tag:', e.message); }
-          }
-          if (tagsImported) {
-            applyCustomTags();
-            await persistDb();
-          }
+        // Flatten so bundled multi-tag files (stored as a nested array) import too.
+        const tagList = flattenTagData(await tagsRes.json());
+        for (const tagData of tagList) {
+          try { if (applyTagData(tagData, true)) tagsImported++; }
+          catch(e) { console.warn('[Tags] Skipping invalid tag:', e.message); }
+        }
+        if (tagsImported) {
+          applyCustomTags();
+          await persistDb();
         }
       }
     } catch(e) {
