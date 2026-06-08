@@ -2494,11 +2494,23 @@ function renderCustomTagList() {
     </div>`).join('');
 }
 
+// Attach each person's current display name to their assignment, so a future
+// re-import can re-match people by name even if the source data changes its
+// PersonID scheme (which orphans id-only tags — see applyTagData).
+function enrichAssignments(assignments) {
+  const m = new Map();
+  if (db) {
+    const res = db.exec(`SELECT id, display_name FROM persons`);
+    if (res.length) for (const [id, dn] of res[0].values) m.set(id, dn || '');
+  }
+  return (assignments || []).map(a => ({ personId: a.personId, name: a.name || m.get(a.personId) || '' }));
+}
+
 function exportCustomTag(idx) {
   const tags = loadCustomTags();
   const t = tags[idx];
   if (!t) return;
-  const payload = { version: 1, tagName: t.name, assignments: t.assignments };
+  const payload = { version: 1, tagName: t.name, assignments: enrichAssignments(t.assignments) };
   const safe = t.name.replace(/[^a-z0-9]/gi, '_');
   triggerDownload(JSON.stringify(payload, null, 2), `tag_${safe}.json`, 'application/json');
 }
@@ -2507,7 +2519,7 @@ function exportCustomTag(idx) {
 function exportAllCustomTags() {
   const tags = loadCustomTags();
   if (!tags.length) { toast('No custom tags to export'); return; }
-  const payload = tags.map(t => ({ version: 1, tagName: t.name, assignments: t.assignments }));
+  const payload = tags.map(t => ({ version: 1, tagName: t.name, assignments: enrichAssignments(t.assignments) }));
   triggerDownload(JSON.stringify(payload, null, 2), 'tags_exported.json', 'application/json');
   toast(`Exported ${tags.length} tag${tags.length === 1 ? '' : 's'}`);
 }
@@ -2536,7 +2548,7 @@ async function uploadCustomTag(idx) {
     return;
   }
 
-  const payload = { version: 1, tagName: t.name, assignments: t.assignments };
+  const payload = { version: 1, tagName: t.name, assignments: enrichAssignments(t.assignments) };
   const safe = t.name.replace(/[^a-z0-9]/gi, '_');
   const filename = `tag_${safe}.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -2586,25 +2598,62 @@ async function deleteCustomTag(idx) {
 // Merges a single parsed tag object into localStorage.
 // autoReplace=true skips the confirm dialog and always replaces existing entries.
 // Returns false if the user cancelled, true otherwise. Throws on invalid data.
+// Build lookups from the currently-loaded directory: the set of valid person
+// ids, plus a display-name → id map used to re-attach assignments whose ids
+// came from an older export with a different PersonID scheme.
+function buildPersonLookup() {
+  const validPids = new Set();
+  const nameToId = new Map();
+  if (!db) return { validPids, nameToId };
+  const res = db.exec(`SELECT id, display_name FROM persons`);
+  if (res.length) for (const [id, dn] of res[0].values) {
+    validPids.add(id);
+    const key = (dn || '').trim().toLowerCase();
+    if (key && !nameToId.has(key)) nameToId.set(key, id);
+  }
+  return { validPids, nameToId };
+}
+
+// Returns false if the user cancels a replace; otherwise a result object
+// describing how many assignments actually attach to the current directory.
 function applyTagData(data, autoReplace = false) {
   if (data.version !== 1 || typeof data.tagName !== 'string' || !Array.isArray(data.assignments)) {
     throw new Error('Invalid tag file format');
   }
+  const { validPids, nameToId } = buildPersonLookup();
+
+  // Resolve each assignment to someone in the CURRENT directory: by id first,
+  // then by display name. `effective` counts people who actually match now;
+  // unmatched ids are kept verbatim in case the matching CSV loads later.
+  const resolved = [];
+  let effective = 0, remapped = 0, orphaned = 0;
+  for (const a of data.assignments) {
+    const name = typeof a.name === 'string' ? a.name : '';
+    let pid = typeof a.personId === 'number' ? a.personId : null;
+    if (pid !== null && validPids.has(pid)) {
+      effective++;
+    } else {
+      const byName = name.trim() ? nameToId.get(name.trim().toLowerCase()) : undefined;
+      if (byName !== undefined) { pid = byName; effective++; remapped++; }
+      else { orphaned++; }
+    }
+    if (pid !== null) resolved.push({ personId: pid, name });
+  }
+
   const tags = loadCustomTags();
-  const newAssignments = data.assignments.filter(a => typeof a.personId === 'number');
   let entry = tags.find(t => t.name === data.tagName);
   if (entry) {
     if (!autoReplace) {
-      if (!confirm(`A custom tag named "${data.tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${newAssignments.length} assignment(s) from the imported file. Continue?`)) {
+      if (!confirm(`A custom tag named "${data.tagName}" already exists with ${entry.assignments.length} assignment(s).\n\nThis will replace all existing assignments with the ${resolved.length} assignment(s) from the imported file. Continue?`)) {
         return false;
       }
     }
-    entry.assignments = newAssignments;
+    entry.assignments = resolved;
   } else {
-    tags.push({ name: data.tagName, assignments: newAssignments });
+    tags.push({ name: data.tagName, assignments: resolved });
   }
   saveCustomTags(tags);
-  return true;
+  return { tagName: data.tagName, total: data.assignments.length, effective, remapped, orphaned };
 }
 
 async function importCustomTagFile(file) {
@@ -2616,13 +2665,14 @@ async function importCustomTagFile(file) {
     const tagList = Array.isArray(parsed) ? parsed : [parsed];
     if (!tagList.length) throw new Error('No tags in file');
 
-    const importedNames = [];
+    const results = [];
     let cancelled = 0;
     for (const data of tagList) {
-      if (applyTagData(data, false)) importedNames.push(data.tagName);
+      const r = applyTagData(data, false);
+      if (r) results.push(r);
       else cancelled++;
     }
-    if (!importedNames.length) {
+    if (!results.length) {
       if (statusEl) statusEl.textContent = 'Import cancelled.';
       return;
     }
@@ -2633,9 +2683,23 @@ async function importCustomTagFile(file) {
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
     renderCustomTagList();
-    const label = importedNames.length === 1 ? `"${importedNames[0]}"` : `${importedNames.length} tags`;
-    if (statusEl) statusEl.textContent = `✓ Imported ${label}` + (cancelled ? ` (${cancelled} skipped)` : '');
-    toast(`Imported ${label}`);
+
+    const totalEff   = results.reduce((s, r) => s + r.effective, 0);
+    const totalRemap = results.reduce((s, r) => s + r.remapped, 0);
+    const zero       = results.filter(r => r.effective === 0);
+    const label      = results.length === 1 ? `"${results[0].tagName}"` : `${results.length} tags`;
+
+    let msg = `✓ Imported ${label} — ${totalEff} ${totalEff === 1 ? 'person' : 'people'}`;
+    if (totalRemap) msg += `, ${totalRemap} re-matched by name`;
+    if (cancelled)  msg += ` (${cancelled} skipped)`;
+    if (zero.length) {
+      const which = zero.length === results.length ? 'none' : zero.map(r => `"${r.tagName}"`).join(', ');
+      msg += ` — ⚠ ${which} matched anybody in the current directory (likely an older export with different PersonIDs)`;
+    }
+    if (statusEl) statusEl.textContent = msg;
+    toast(zero.length
+      ? `Imported ${label}, but ${zero.length} tag${zero.length === 1 ? '' : 's'} matched nobody`
+      : `Imported ${label} (${totalEff} people)`);
   } catch(e) {
     if (statusEl) statusEl.textContent = `✗ ${e.message}`;
     toast(`Import failed: ${e.message}`);
