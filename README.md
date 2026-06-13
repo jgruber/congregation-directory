@@ -59,6 +59,30 @@ Each person is displayed as a card showing:
 
 Tap or click any card to open a **detail modal** showing full contact information, all tags organised by category, and biographical details.
 
+- **Sort & group** — a control in the results header sorts cards by name or age, or groups them by field service group or family.
+- **Per-person notes** — the detail modal has a free-text **Notes** field. Notes are stored locally in your browser (IndexedDB), kept separate from the imported CSV so they survive re-imports. A 📝 marker appears on cards that have a note.
+
+### Analysis & Reports
+
+Accessed via the **Analyze** menu in the results header. Every report reflects the **current filter/search** — filter first to scope a report to a group, age band, etc.
+
+- **Statistics** — gender breakdown and age distribution.
+- **Demographics & Care** — median age, % over 65, children, baptized publishers; appointment ratios (publishers per elder, pioneers as % of publishers); congregation-wide household counts (single vs. multi-person, households with children); groups flagged for having one elder or no ministerial servant; and a **care list** of those marked elderly/infirm, blind, deaf, or incarcerated, highlighting who lives alone.
+- **Capability Coverage** — for each meeting part and hall duty, how many people are marked eligible. Counts are colour-coded so **0 (nobody)** and **1–2 (single point of failure)** stand out; expand any row to see exactly who. Filter to *Active* first for a realistic picture.
+- **Map** — family markers with geocoding (see existing map features).
+- **FSGs** — service group distribution chart and table.
+- **Data Quality** — records missing a mobile, email, address, coordinates, or date of birth, plus incomplete addresses. Expand a category to see and open the affected people, then fix them in New World Scheduler and re-import.
+
+### Actions, Sharing & Print
+
+Accessed via the **Actions** menu (operates on the current results):
+
+- **Email All / Text All** — open a pre-addressed email or SMS.
+- **Copy Emails / Copy Phone Numbers** — copy the current list to the clipboard for pasting into other tools.
+- **vCards** — download contacts.
+- **Print…** — choose a **Directory** table, per-group **FSG Contact Sheets** (one page per group), or a household **Address List**.
+- **Saved Filters…** — name and store the current filter/search combination, then re-apply it in one click later. Presets are saved in browser `localStorage`.
+
 ### Data Import
 
 **Manual CSV Upload**

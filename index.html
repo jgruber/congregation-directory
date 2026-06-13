@@ -72,6 +72,22 @@
     .dark .person-card.selected {
       background-color: color-mix(in srgb, var(--p) 15%, transparent);
     }
+
+    /* Print output */
+    #printRoot { display: none; }
+    @media print {
+      body > :not(#printRoot) { display: none !important; }
+      #printRoot { display: block !important; color: #000; }
+      #printRoot h1 { font-size: 18px; margin: 0 0 2px; }
+      #printRoot .print-meta { font-size: 11px; color: #555; margin-bottom: 12px; }
+      #printRoot h2 { font-size: 14px; margin: 16px 0 6px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+      #printRoot table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      #printRoot th, #printRoot td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #ccc; vertical-align: top; }
+      #printRoot th { border-bottom: 1px solid #000; font-weight: 600; }
+      #printRoot .fsg-section { page-break-inside: avoid; }
+      #printRoot .fsg-section + .fsg-section { page-break-before: always; }
+      @page { margin: 14mm; }
+    }
   </style>
   <script>
     tailwind.config = {
@@ -241,6 +257,24 @@
                   </svg>
                   Statistics
                 </button>
+                <button onclick="openDemographicsModal(); closeToolMenus()"
+                  class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                         dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  Demographics &amp; Care
+                </button>
+                <button onclick="openCapabilityModal(); closeToolMenus()"
+                  class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                         dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                  </svg>
+                  Capability Coverage
+                </button>
                 <button onclick="openMapModal(); closeToolMenus()"
                   class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
                          dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -259,8 +293,29 @@
                   </svg>
                   FSGs
                 </button>
+                <button onclick="openDataQualityModal(); closeToolMenus()"
+                  class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                         dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Data Quality
+                </button>
               </div>
             </div>
+            <!-- Sort / group control -->
+            <select id="sortSelect" onchange="setSortMode(this.value)" title="Sort / group"
+              class="flex-shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-transparent
+                     text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700
+                     focus:outline-none focus:ring-1 focus:ring-[var(--pr)] cursor-pointer">
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              <option value="age-desc">Age (oldest)</option>
+              <option value="age-asc">Age (youngest)</option>
+              <option value="fsg">Group by FSG</option>
+              <option value="family">Group by family</option>
+            </select>
           </div>
 
           <!-- Right: Actions dropdown -->
@@ -291,6 +346,15 @@
                 </svg>
                 Email All
               </button>
+              <button onclick="copyEmails(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                Copy Emails
+              </button>
               <button onclick="smsAll(); closeToolMenus()"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
                        dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -300,6 +364,15 @@
                 </svg>
                 Text All
               </button>
+              <button onclick="copyPhones(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                Copy Phone Numbers
+              </button>
               <button onclick="downloadAllVCards(); closeToolMenus()"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
                        dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -308,6 +381,24 @@
                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
                 vCards
+              </button>
+              <button onclick="openPrintModal(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                </svg>
+                Print…
+              </button>
+              <button onclick="openPresetsModal(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                </svg>
+                Saved Filters…
               </button>
               <div class="my-1 border-t border-gray-100 dark:border-gray-800"></div>
               <button id="editModeToggleBtn"
@@ -484,6 +575,109 @@
         <canvas id="statsFsgChart"></canvas>
       </div>
       <div id="statsFsgTable" class="text-xs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ DEMOGRAPHICS & CARE MODAL ═══════════════════════ -->
+<div id="demographicsModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closeDemographicsModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-3xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-base font-semibold">Demographics &amp; Care</h2>
+      <button onclick="closeDemographicsModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="demographicsContent" class="overflow-y-auto px-5 py-5 space-y-6"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ CAPABILITY COVERAGE MODAL ═══════════════════════ -->
+<div id="capabilityModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closeCapabilityModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-3xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-base font-semibold">Capability Coverage</h2>
+      <button onclick="closeCapabilityModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="capabilityContent" class="overflow-y-auto px-5 py-5 space-y-5"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ DATA QUALITY MODAL ═══════════════════════ -->
+<div id="dataQualityModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closeDataQualityModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-3xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-base font-semibold">Data Quality</h2>
+      <button onclick="closeDataQualityModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="dataQualityContent" class="overflow-y-auto px-5 py-5 space-y-4"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PRINT MODAL ═══════════════════════ -->
+<div id="printModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closePrintModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-md sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-base font-semibold">Print</h2>
+      <button onclick="closePrintModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="overflow-y-auto px-5 py-5 space-y-3">
+      <p id="printIntro" class="text-xs text-gray-500 dark:text-gray-400"></p>
+      <button onclick="printDirectory()"
+        class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[var(--p)] hover:bg-primary-light dark:hover:bg-gray-800 transition-colors">
+        <div class="text-sm font-medium">Directory</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">One table of everyone in the current results.</div>
+      </button>
+      <button onclick="printFsgSheets()"
+        class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[var(--p)] hover:bg-primary-light dark:hover:bg-gray-800 transition-colors">
+        <div class="text-sm font-medium">FSG Contact Sheets</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">One page per field service group.</div>
+      </button>
+      <button onclick="printAddressList()"
+        class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[var(--p)] hover:bg-primary-light dark:hover:bg-gray-800 transition-colors">
+        <div class="text-sm font-medium">Address List</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">Households grouped by family, with addresses.</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SAVED FILTERS MODAL ═══════════════════════ -->
+<div id="presetsModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closePresetsModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-md sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <h2 class="text-base font-semibold">Saved Filters</h2>
+      <button onclick="closePresetsModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="overflow-y-auto px-5 py-5 space-y-4">
+      <button onclick="saveCurrentPreset()"
+        class="w-full px-4 py-2 rounded-lg text-sm font-medium text-white btn-primary transition-colors">
+        Save current filters…
+      </button>
+      <div id="presetList" class="space-y-2"></div>
     </div>
   </div>
 </div>
@@ -763,6 +957,8 @@ const IDB_VERSION = 1;
 const DB_KEY      = 'sqlite_db';
 const SETTINGS_KEY = 'dir_settings';
 const CUSTOM_TAGS_KEY = 'dir_custom_tags';
+const PRESETS_KEY  = 'dir_filter_presets';   // saved filter presets (localStorage)
+const NOTES_IDB_KEY = 'person_notes';        // per-person notes (IndexedDB kv)
 const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
 
 function dbLog(label, sql, params) {
@@ -822,6 +1018,51 @@ const AVATAR_COLORS = [
   'bg-rose-500','bg-teal-500','bg-indigo-500','bg-pink-500','bg-cyan-500',
 ];
 
+// Capability / assignment-eligibility columns on the persons table, grouped for
+// the Capability Coverage report. Each entry: [persons-table column, display label].
+// NOTE: the Hall Duties labels mirror the default useForMap labels and are
+// congregation-specific — adjust to match your congregation's customization.
+const CAPABILITIES = [
+  ['Midweek Meeting', [
+    ['clm_chairman',                  'Chairman'],
+    ['clm_auxiliary_counselor',       'Auxiliary Counselor'],
+    ['prayer',                        'Prayer'],
+    ['clm_treasures',                 'Treasures Talk'],
+    ['clm_gems',                      'Spiritual Gems'],
+    ['clm_bible_reading',             'Bible Reading'],
+    ['clm_initial_call',              'Initial Call'],
+    ['clm_follow_up',                 'Follow Up'],
+    ['clm_making_disciples',          'Making Disciples'],
+    ['clm_explaining_beliefs',        'Explaining Beliefs'],
+    ['clm_talk',                      'Student Talk'],
+    ['clm_assistant',                 'Student Assistant'],
+    ['clm_living_as_christians_parts','Living as Christians Parts'],
+    ['clm_cbs_conductor',             'CBS Conductor'],
+    ['clm_cbs_reader',                'CBS Reader'],
+  ]],
+  ['Weekend Meeting', [
+    ['public_talks_local',            'Public Talk (Local)'],
+    ['public_talks_away',             'Public Talk (Away)'],
+    ['public_meeting_chairman',       'Weekend Chairman'],
+    ['watchtower_reader',             'Watchtower Reader'],
+  ]],
+  ['Field Service', [
+    ['public_witnessing',             'Public Witnessing'],
+    ['public_witnessing_key_person',  'Public Witnessing Key Person'],
+    ['meeting_for_service_conductor', 'Meeting for Service Conductor'],
+    ['meeting_for_service_prayer',    'Meeting for Service Prayer'],
+  ]],
+  ['Hall Duties & Maintenance', [
+    ['auditorium_attendant',          'Auditorium Attendant'],
+    ['entrance_attendant',            'Entrance Attendant'],
+    ['video_conference_host',         'Video Conference Host'],
+    ['microphones',                   'Microphones'],
+    ['av_operator',                   'Audio/Video Operator'],
+    ['av_stage',                      'Stage'],
+    ['maintenance_volunteer',         'Maintenance Volunteer'],
+  ]],
+];
+
 /* ─────────────────────────────────────────
    STATE
 ───────────────────────────────────────── */
@@ -839,6 +1080,8 @@ let searchText   = '';
 let autoSyncTimer = null;
 let editMode      = false;
 let selectedPids  = new Set();
+let sortMode      = 'name-asc';   // card sort / grouping mode
+let personNotes   = {};           // { personId: noteText }, persisted in IndexedDB
 
 let settings = {
   csvUrl:               '',
@@ -1806,7 +2049,7 @@ function renderResults() {
   hdr.classList.remove('hidden');
   (countEl.querySelector('#resultsCountText') || countEl).textContent = `${persons.length} of ${stats?.persons ?? 0} persons`;
 
-  grid.innerHTML = persons.map(renderCard).join('');
+  grid.innerHTML = renderCardsHtml(persons);
 }
 
 function calcAge(dob) {
@@ -1903,7 +2146,10 @@ function renderCard(p) {
         <div class="flex-shrink-0 w-10 h-10 rounded-full ${av}
                     flex items-center justify-center text-white font-bold text-sm">${ini}</div>
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-sm truncate">${name}</div>
+          <div class="font-semibold text-sm truncate flex items-center gap-1">
+            <span class="truncate">${name}</span>
+            <span class="note-indicator flex-shrink-0${personNotes[p.id] ? '' : ' hidden'}" title="Has a note">📝</span>
+          </div>
           ${genderAge}
           ${fsg}${fam}
         </div>
@@ -2319,6 +2565,16 @@ function openPersonDetail(pid) {
         </div>`).join('') +
       `</div></div>`;
   }
+
+  // Notes (stored locally per device, separate from imported data)
+  const note = personNotes[pid] || '';
+  html += `<div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Notes</p>
+    <textarea onchange="savePersonNote(${pid}, this.value)"
+      placeholder="Private notes (stored locally on this device only)…"
+      class="w-full h-24 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700
+             bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--pr)] resize-y">${h(note)}</textarea>
+  </div>`;
 
   document.getElementById('personModalContent').innerHTML = html;
   document.getElementById('personModal').classList.remove('hidden');
@@ -2974,6 +3230,7 @@ async function init() {
     renderTagPanel('tagPanelDesktop');
     renderTagPanel('tagPanelMobile');
   }
+  await loadPersonNotes();
   renderResults();
 
   // Auto-sync: run if overdue
@@ -3722,6 +3979,511 @@ function renderStatsCharts() {
 }
 
 /* ── QR Code Scanner ──────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────
+   ANALYSIS & FEATURE EXTENSIONS
+───────────────────────────────────────── */
+
+// Pull full persons-table rows for the current (filtered) result set.
+function currentPersonRows(cols) {
+  if (!db || !currentPersons.length) return [];
+  const ids = currentPersons.map(p => p.id).filter(x => x != null);
+  if (!ids.length) return [];
+  try {
+    const res = db.exec(`SELECT ${cols || '*'} FROM persons WHERE id IN (${ids.join(',')})`);
+    if (!res.length) return [];
+    return res[0].values.map(row => { const o = {}; res[0].columns.forEach((c, i) => o[c] = row[i]); return o; });
+  } catch (e) { console.error(e); return []; }
+}
+
+function personFullName(p) {
+  return (p.display_name || `${p.first_name || ''} ${p.last_name || ''}`).trim();
+}
+
+function emptyAnalysisMsg() {
+  return '<p class="text-sm text-gray-400 text-center py-8">No people in the current results. Adjust your filters and try again.</p>';
+}
+
+// Household size per family_id across the WHOLE congregation (not just the filter),
+// so "lives alone" reflects true household composition.
+function householdSizeMap() {
+  const m = {};
+  if (!db) return m;
+  try {
+    const res = db.exec(`SELECT family_id, COUNT(*) FROM persons WHERE family_id > 0 GROUP BY family_id`);
+    if (res.length) for (const [fid, c] of res[0].values) m[fid] = c;
+  } catch (e) {}
+  return m;
+}
+
+// ── Capability Coverage ─────────────────────────────────────────────────────
+function openCapabilityModal() {
+  document.getElementById('capabilityModal').classList.remove('hidden');
+  renderCapabilityReport();
+}
+function closeCapabilityModal() {
+  document.getElementById('capabilityModal').classList.add('hidden');
+}
+function renderCapabilityReport() {
+  const el = document.getElementById('capabilityContent');
+  const rows = currentPersonRows('*');
+  if (!rows.length) { el.innerHTML = emptyAnalysisMsg(); return; }
+
+  const sevCell = (n) => n === 0
+    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+    : n <= 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+             : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+
+  let html = `
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+      How many of the <strong>${rows.length}</strong> people in the current results are marked eligible for each
+      assignment. <span class="text-red-600 dark:text-red-400 font-medium">0 = nobody</span>,
+      <span class="text-amber-600 dark:text-amber-400 font-medium">1–2 = single point of failure</span>.
+      Tip: filter to <em>Active</em> first for a realistic picture.
+    </p>`;
+
+  for (const [group, items] of CAPABILITIES) {
+    const computed = items.map(([col, label]) => {
+      const people = rows.filter(r => r[col]);
+      return { label, count: people.length, people };
+    }).sort((a, b) => a.count - b.count);
+
+    html += `<div>
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">${h(group)}</h3>
+      <div class="space-y-1.5">` +
+      computed.map(c => `
+        <details class="rounded-lg border border-gray-200 dark:border-gray-800">
+          <summary class="flex items-center gap-2 px-3 py-2 cursor-pointer list-none">
+            <span class="inline-flex items-center justify-center min-w-[2rem] px-1.5 py-0.5 rounded-full text-xs font-semibold ${sevCell(c.count)}">${c.count}</span>
+            <span class="text-sm flex-1">${h(c.label)}</span>
+            <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </summary>
+          <div class="px-3 pb-2.5 pt-0.5 flex flex-wrap gap-1.5">
+            ${c.people.length
+              ? c.people.map(p => `<button onclick="openPersonDetail(${p.id})" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">${h(personFullName(p))}</button>`).join('')
+              : '<span class="text-xs text-gray-400">No one eligible.</span>'}
+          </div>
+        </details>`).join('') +
+      `</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ── Demographics & Care ─────────────────────────────────────────────────────
+function openDemographicsModal() {
+  document.getElementById('demographicsModal').classList.remove('hidden');
+  renderDemographics();
+}
+function closeDemographicsModal() {
+  document.getElementById('demographicsModal').classList.add('hidden');
+}
+function median(nums) {
+  if (!nums.length) return null;
+  const s = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+}
+function renderDemographics() {
+  const el = document.getElementById('demographicsContent');
+  const rows = currentPersonRows('*');
+  if (!rows.length) { el.innerHTML = emptyAnalysisMsg(); return; }
+
+  const ages = rows.map(r => calcAge(r.date_of_birth)).filter(a => a !== null);
+  const over65 = ages.filter(a => a >= 65).length;
+  const children = rows.filter(r => r.child).length;
+  const baptized = rows.filter(r => r.baptized).length;
+  const elders = rows.filter(r => r.elder).length;
+  const ms = rows.filter(r => r.ministerial_servant).length;
+  const pioneers = rows.filter(r => r.pioneer || r.special_pioneer || r.regular_auxiliary).length;
+
+  // Households (whole congregation)
+  const sizes = householdSizeMap();
+  let solo = 0;
+  try {
+    const r = db.exec(`SELECT COUNT(*) FROM persons WHERE family_id = 0 OR family_id IS NULL`);
+    if (r.length) solo = r[0].values[0][0];
+  } catch (e) {}
+  const famSizes = Object.values(sizes);
+  const singleHouseholds = famSizes.filter(n => n === 1).length + solo;
+  const multiHouseholds = famSizes.filter(n => n > 1).length;
+  let famWithKids = 0;
+  try {
+    const r = db.exec(`SELECT COUNT(DISTINCT family_id) FROM persons WHERE family_id > 0 AND child = 1`);
+    if (r.length) famWithKids = r[0].values[0][0];
+  } catch (e) {}
+
+  const card = (label, val, sub) => `
+    <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <div class="text-2xl font-bold">${val}</div>
+      <div class="text-xs text-gray-500 dark:text-gray-400">${label}</div>
+      ${sub ? `<div class="text-[11px] text-gray-400 mt-0.5">${sub}</div>` : ''}
+    </div>`;
+  const ratio = (a, b) => b ? (a / b).toFixed(1) : '—';
+  const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+
+  // Per-group appointment gaps (whole congregation)
+  let gapRows = [];
+  try {
+    const r = db.exec(`SELECT field_service_group_name, SUM(elder), SUM(ministerial_servant), COUNT(*)
+                       FROM persons WHERE field_service_group_name IS NOT NULL
+                         AND field_service_group_name != '' AND field_service_group_name != 'Unassigned'
+                       GROUP BY field_service_group_name ORDER BY field_service_group_name`);
+    if (r.length) gapRows = r[0].values.map(([name, e, m2, t]) => ({ name, elders: e || 0, ms: m2 || 0, total: t }));
+  } catch (e) {}
+  const gaps = gapRows.filter(g => g.elders <= 1 || g.ms === 0);
+
+  el.innerHTML = `
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Overview (${rows.length} in results)</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        ${card('Median age', median(ages) ?? '—')}
+        ${card('Over 65', over65, pct(over65, ages.length) + ' of known ages')}
+        ${card('Children', children)}
+        ${card('Baptized publishers', baptized)}
+      </div>
+    </div>
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Appointment ratios</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        ${card('Elders', elders)}
+        ${card('Min. servants', ms)}
+        ${card('Pioneers', pioneers, pct(pioneers, baptized) + ' of publishers')}
+        ${card('Publishers / elder', ratio(baptized, elders))}
+      </div>
+    </div>
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Households (congregation-wide)</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        ${card('Single-person', singleHouseholds)}
+        ${card('Multi-person', multiHouseholds)}
+        ${card('With children', famWithKids)}
+        ${card('Total households', singleHouseholds + multiHouseholds)}
+      </div>
+    </div>
+    ${gaps.length ? `<div>
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Groups needing attention</h3>
+      <div class="space-y-1.5">
+        ${gaps.map(g => `<div class="flex items-center gap-2 text-sm p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+            <span class="font-medium flex-1">${h(g.name)}</span>
+            <span class="text-xs ${g.elders <= 1 ? 'text-red-600 dark:text-red-400' : 'text-gray-500'}">${g.elders} elder${g.elders === 1 ? '' : 's'}</span>
+            <span class="text-xs ${g.ms === 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500'}">${g.ms} MS</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+    ${renderCareList(rows, sizes)}`;
+}
+
+function renderCareList(rows, sizes) {
+  const care = rows.filter(r => r.infirm || r.bind || r.deaf || r.incarcerated);
+  if (!care.length) return '';
+  const livesAlone = (r) => !r.family_id || (sizes[r.family_id] || 1) === 1;
+  const tagsFor = (r) => {
+    const t = [];
+    if (r.infirm) t.push('Elderly/Infirm');
+    if (r.bind) t.push('Blind');
+    if (r.deaf) t.push('Deaf');
+    if (r.incarcerated) t.push('Incarcerated');
+    return t;
+  };
+  const sorted = [...care].sort((a, b) =>
+    (livesAlone(b) - livesAlone(a)) || ((calcAge(b.date_of_birth) || 0) - (calcAge(a.date_of_birth) || 0)));
+  return `<div>
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Care list (${care.length})</h3>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">People flagged elderly/infirm, blind, deaf, or incarcerated. "Lives alone" is highlighted for shepherding priority.</p>
+    <div class="space-y-1.5">
+      ${sorted.map(r => {
+        const age = calcAge(r.date_of_birth);
+        const alone = livesAlone(r);
+        return `<button onclick="openPersonDetail(${r.id})" class="w-full text-left flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <span class="text-sm font-medium flex-1 truncate">${h(personFullName(r))}${age !== null ? ` <span class="text-xs text-gray-400">${age}</span>` : ''}</span>
+          ${alone ? '<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">lives alone</span>' : ''}
+          ${tagsFor(r).map(t => `<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${h(t)}</span>`).join('')}
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Data Quality ────────────────────────────────────────────────────────────
+function openDataQualityModal() {
+  document.getElementById('dataQualityModal').classList.remove('hidden');
+  renderDataQuality();
+}
+function closeDataQualityModal() {
+  document.getElementById('dataQualityModal').classList.add('hidden');
+}
+function renderDataQuality() {
+  const el = document.getElementById('dataQualityContent');
+  const rows = currentPersonRows('*');
+  if (!rows.length) { el.innerHTML = emptyAnalysisMsg(); return; }
+
+  const has = v => (v || '').toString().trim().length > 0;
+  const noDob = r => !r.date_of_birth || r.date_of_birth <= '1900/01/01';
+
+  const checks = [
+    ['No mobile number', rows.filter(r => !has(r.mobile))],
+    ['No email address', rows.filter(r => !has(r.email))],
+    ['No address', rows.filter(r => !has(r.address) && !has(r.city) && !has(r.full_address))],
+    ['Incomplete address', rows.filter(r => has(r.address) && (!has(r.city) || !has(r.postal_code)))],
+    ['Not geocoded (no map pin)', rows.filter(r => has(r.full_address) && (r.latitude == null || r.longitude == null))],
+    ['No date of birth', rows.filter(noDob)],
+  ];
+
+  el.innerHTML = `
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+      Gaps in the <strong>${rows.length}</strong> records in the current results. Fix these in New World Scheduler and re-import.
+    </p>` +
+    checks.map(([label, list]) => `
+      <details class="rounded-lg border border-gray-200 dark:border-gray-800">
+        <summary class="flex items-center gap-2 px-3 py-2 cursor-pointer list-none">
+          <span class="inline-flex items-center justify-center min-w-[2rem] px-1.5 py-0.5 rounded-full text-xs font-semibold ${list.length ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}">${list.length}</span>
+          <span class="text-sm flex-1">${h(label)}</span>
+          <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+        <div class="px-3 pb-2.5 pt-0.5 flex flex-wrap gap-1.5">
+          ${list.length
+            ? list.map(p => `<button onclick="openPersonDetail(${p.id})" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">${h(personFullName(p))}</button>`).join('')
+            : '<span class="text-xs text-gray-400">All good.</span>'}
+        </div>
+      </details>`).join('');
+}
+
+// ── Sort / group display ────────────────────────────────────────────────────
+function setSortMode(v) {
+  sortMode = v;
+  renderResults();
+}
+function sortPersonsForDisplay(persons) {
+  const copy = [...persons];
+  const ageOf = p => { const a = calcAge(p.date_of_birth); return a == null ? -1 : a; };
+  const byName = (a, b) =>
+    (a.last_name || '').localeCompare(b.last_name || '') ||
+    (a.first_name || '').localeCompare(b.first_name || '');
+  switch (sortMode) {
+    case 'name-desc': copy.sort((a, b) => byName(b, a)); break;
+    case 'age-asc':   copy.sort((a, b) => ageOf(a) - ageOf(b) || byName(a, b)); break;
+    case 'age-desc':  copy.sort((a, b) => ageOf(b) - ageOf(a) || byName(a, b)); break;
+    default:          copy.sort(byName);
+  }
+  return copy;
+}
+function renderCardsHtml(persons) {
+  if (sortMode === 'fsg' || sortMode === 'family') {
+    const keyOf = sortMode === 'fsg'
+      ? (p => p.field_service_group_name || 'Unassigned')
+      : (p => p.family_name || '—');
+    const groups = {};
+    for (const p of persons) { const k = keyOf(p); (groups[k] = groups[k] || []).push(p); }
+    const keys = Object.keys(groups).sort((a, b) => {
+      if (a === 'Unassigned' || a === '—') return 1;
+      if (b === 'Unassigned' || b === '—') return -1;
+      return a.localeCompare(b);
+    });
+    return keys.map(k => {
+      const members = [...groups[k]].sort((a, b) =>
+        (a.last_name || '').localeCompare(b.last_name || '') || (a.first_name || '').localeCompare(b.first_name || ''));
+      return `<div class="col-span-full mt-1 mb-0.5 flex items-center gap-2">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">${h(k)}</h3>
+          <span class="text-xs text-gray-400">${members.length}</span>
+          <div class="flex-1 border-t border-gray-200 dark:border-gray-800"></div>
+        </div>` + members.map(renderCard).join('');
+    }).join('');
+  }
+  return sortPersonsForDisplay(persons).map(renderCard).join('');
+}
+
+// ── Clipboard ───────────────────────────────────────────────────────────────
+async function copyToClipboard(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(label);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(label); } catch (_) { toast('Copy failed'); }
+    document.body.removeChild(ta);
+  }
+}
+function copyEmails() {
+  const emails = [...new Set(currentPersons.map(p => p.email).filter(Boolean))];
+  if (!emails.length) { toast('No email addresses in current results'); return; }
+  copyToClipboard(emails.join(', '), `Copied ${emails.length} email${emails.length === 1 ? '' : 's'}`);
+}
+function copyPhones() {
+  const nums = [...new Set(currentPersons.map(p => p.mobile).filter(Boolean))];
+  if (!nums.length) { toast('No mobile numbers in current results'); return; }
+  copyToClipboard(nums.join(', '), `Copied ${nums.length} number${nums.length === 1 ? '' : 's'}`);
+}
+
+// ── Per-person notes ────────────────────────────────────────────────────────
+async function loadPersonNotes() {
+  try { personNotes = (await idbGet(NOTES_IDB_KEY)) || {}; }
+  catch (e) { personNotes = {}; }
+}
+function savePersonNote(pid, text) {
+  const t = (text || '').trim();
+  if (t) personNotes[pid] = t; else delete personNotes[pid];
+  idbPut(NOTES_IDB_KEY, personNotes).catch(console.error);
+  const ind = document.querySelector(`.person-card[data-pid="${pid}"] .note-indicator`);
+  if (ind) ind.classList.toggle('hidden', !t);
+}
+
+// ── Saved filter presets ────────────────────────────────────────────────────
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function savePresets(arr) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(arr));
+}
+function openPresetsModal() {
+  document.getElementById('presetsModal').classList.remove('hidden');
+  renderPresetList();
+}
+function closePresetsModal() {
+  document.getElementById('presetsModal').classList.add('hidden');
+}
+function captureFilterState() {
+  return {
+    searchText,
+    activeFilters: activeFilters.map(f => ({ name: f.name, tagType: f.tagType, mode: f.mode })),
+    filterMode, ageMin, ageMax,
+    fsgFilter: [...fsgFilter],
+    familyFilter: [...familyFilter],
+  };
+}
+function saveCurrentPreset() {
+  const name = (prompt('Name this filter preset:') || '').trim();
+  if (!name) return;
+  const presets = loadPresets();
+  const entry = { name, state: captureFilterState() };
+  const existing = presets.findIndex(p => p.name === name);
+  if (existing >= 0) presets[existing] = entry; else presets.push(entry);
+  savePresets(presets);
+  renderPresetList();
+  toast(`Saved filter "${name}"`);
+}
+function applyPreset(idx) {
+  const presets = loadPresets();
+  const p = presets[idx];
+  if (!p) return;
+  const s = p.state || {};
+  searchText   = s.searchText || '';
+  activeFilters = (s.activeFilters || []).map(f => ({ id: Date.now() + Math.random(), name: f.name, tagType: f.tagType, mode: f.mode }));
+  filterMode   = s.filterMode || 'AND';
+  ageMin       = s.ageMin ?? null;
+  ageMax       = s.ageMax ?? null;
+  fsgFilter    = [...(s.fsgFilter || [])];
+  familyFilter = [...(s.familyFilter || [])];
+
+  const si = document.getElementById('searchInput'); if (si) si.value = searchText;
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
+  setVal('ageMinDesktop', ageMin); setVal('ageMinMobile', ageMin);
+  setVal('ageMaxDesktop', ageMax); setVal('ageMaxMobile', ageMax);
+
+  loadSelectOptions();
+  renderActiveFilters();
+  renderTagPanel('tagPanelDesktop');
+  renderTagPanel('tagPanelMobile');
+  renderResults();
+  closePresetsModal();
+  toast(`Applied "${p.name}"`);
+}
+function deletePreset(idx) {
+  const presets = loadPresets();
+  if (!presets[idx]) return;
+  if (!confirm(`Delete filter preset "${presets[idx].name}"?`)) return;
+  presets.splice(idx, 1);
+  savePresets(presets);
+  renderPresetList();
+}
+function renderPresetList() {
+  const el = document.getElementById('presetList');
+  if (!el) return;
+  const presets = loadPresets();
+  if (!presets.length) {
+    el.innerHTML = '<p class="text-xs text-gray-400">No saved filters yet. Set up filters on the main screen, then "Save current filters".</p>';
+    return;
+  }
+  el.innerHTML = presets.map((p, idx) => {
+    const s = p.state || {};
+    const n = (s.activeFilters || []).length + (s.fsgFilter || []).length + (s.familyFilter || []).length +
+              ((s.ageMin != null || s.ageMax != null) ? 1 : 0) + (s.searchText ? 1 : 0);
+    return `<div class="flex items-center gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <button onclick="applyPreset(${idx})" class="flex-1 text-left min-w-0">
+        <div class="text-sm font-medium truncate">${h(p.name)}</div>
+        <div class="text-xs text-gray-400">${n} condition${n === 1 ? '' : 's'} · ${h(s.filterMode || 'AND')}</div>
+      </button>
+      <button onclick="deletePreset(${idx})" title="Delete" class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// ── Print ───────────────────────────────────────────────────────────────────
+function openPrintModal() {
+  if (!currentPersons.length) { toast('No people in current results to print'); return; }
+  document.getElementById('printIntro').textContent =
+    `${currentPersons.length} ${currentPersons.length === 1 ? 'person' : 'people'} in the current results will be printed.`;
+  document.getElementById('printModal').classList.remove('hidden');
+}
+function closePrintModal() {
+  document.getElementById('printModal').classList.add('hidden');
+}
+function printDateStr() {
+  try { return new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); }
+  catch (e) { return ''; }
+}
+function runPrint(innerHtml) {
+  document.getElementById('printRoot').innerHTML = innerHtml;
+  closePrintModal();
+  setTimeout(() => window.print(), 60);
+}
+function printPersonRows(persons) {
+  return persons.map(p => {
+    const appt = p.elder ? 'Elder' : p.ministerial_servant ? 'MS'
+      : p.special_pioneer ? 'Sp. Pioneer' : p.pioneer ? 'Pioneer' : p.regular_auxiliary ? 'Aux. Pioneer' : '';
+    return `<tr><td>${h(personFullName(p))}</td><td>${h(appt)}</td><td>${h(p.mobile || '')}</td><td>${h(p.email || '')}</td></tr>`;
+  }).join('');
+}
+function printHeader(title) {
+  return `<h1>${h(title)}</h1><div class="print-meta">Congregation Directory · ${h(printDateStr())} · ${currentPersons.length} listed</div>`;
+}
+function printDirectory() {
+  const persons = sortPersonsForDisplay(currentPersons);
+  runPrint(printHeader('Directory') +
+    `<table><thead><tr><th>Name</th><th>Appointment</th><th>Mobile</th><th>Email</th></tr></thead>
+     <tbody>${printPersonRows(persons)}</tbody></table>`);
+}
+function printFsgSheets() {
+  const groups = {};
+  for (const p of currentPersons) {
+    const k = p.field_service_group_name || 'Unassigned';
+    (groups[k] = groups[k] || []).push(p);
+  }
+  const keys = Object.keys(groups).sort((a, b) => {
+    if (a === 'Unassigned') return 1; if (b === 'Unassigned') return -1; return a.localeCompare(b);
+  });
+  const html = keys.map(k => {
+    const members = [...groups[k]].sort((a, b) =>
+      (a.last_name || '').localeCompare(b.last_name || '') || (a.first_name || '').localeCompare(b.first_name || ''));
+    return `<div class="fsg-section">
+      <h2>${h(k)} <span style="font-weight:normal">(${members.length})</span></h2>
+      <table><thead><tr><th>Name</th><th>Appointment</th><th>Mobile</th><th>Email</th></tr></thead>
+      <tbody>${printPersonRows(members)}</tbody></table>
+    </div>`;
+  }).join('');
+  runPrint(printHeader('Field Service Group Sheets') + html);
+}
+function printAddressList() {
+  const fams = buildFamilyGroups(currentPersons).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  runPrint(printHeader('Address List') +
+    `<table><thead><tr><th>Household</th><th>Address</th><th>Members</th></tr></thead><tbody>` +
+    fams.map(f => `<tr><td>${h(f.name || '')}</td><td>${h(f.full_address || '')}</td><td>${h(f.members.map(personFullName).join(', '))}</td></tr>`).join('') +
+    `</tbody></table>`);
+}
+
 (function () {
   let stream = null;
   let rafId  = null;
@@ -3846,5 +4608,8 @@ function renderStatsCharts() {
     100% { top: 15%; }
   }
 </style>
+
+<!-- Print output target (hidden on screen, shown only when printing) -->
+<div id="printRoot"></div>
 </body>
 </html>
