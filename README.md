@@ -81,7 +81,50 @@ Accessed via the **Actions** menu (operates on the current results):
 - **Copy Emails / Copy Phone Numbers** — copy the current list to the clipboard for pasting into other tools.
 - **vCards** — download contacts.
 - **Print…** — choose a **Directory** table, per-group **FSG Contact Sheets** (one page per group), or a household **Address List**.
+- **Add Google Calendar Event…** — create one Google Calendar event on your own account that **invites every displayed person** (those with an email address) as attendees. See [Google Calendar Integration](#google-calendar-integration) below.
 - **Saved Filters…** — name and store the current filter/search combination, then re-apply it in one click later. Presets are saved in browser `localStorage`.
+
+### Google Calendar Integration
+
+The **Add Google Calendar Event…** action (in the **Actions** menu) creates a single Google
+Calendar event on the signed-in user's own account and invites the currently displayed people.
+
+**What it does**
+- Filters first: the event invites **every displayed person who has an email address** as an
+  attendee. People without an email are skipped (the dialog shows the count).
+- **Standard title, description, deadline** — a review dialog is pre-filled with editable
+  defaults (title, description, deadline date/time, duration). Your edits are remembered as the
+  new defaults.
+- **Email on creation** — because the people are attendees, Google emails each of them an
+  invitation immediately (with the event and its description).
+- **Reminder before the deadline** — an **email reminder is sent to you (the organizer)** N days
+  before the deadline. Note: Calendar reminders are per-user, so attendees are *not* force-
+  reminded by email; they get the invitation now and keep their own Google default reminders.
+- **Reference other cards** — search-add additional people in the dialog to include
+  `/?pid=<id>` deep-links in the event description. These people are **linked, not invited**;
+  anyone opening a link who also uses this directory lands on that person's card.
+- **Guest privacy** — by default the guest list is hidden so invitees can't see each other's
+  email addresses.
+
+**One-time setup (done once by whoever hosts the app — not by each user)**
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create/select a project and
+   **enable the Google Calendar API**.
+2. Configure the **OAuth consent screen** (User type: External) and add the scopes
+   `.../auth/calendar.events` and `.../auth/userinfo.email`. To let any Google user sign in
+   without an "unverified app" warning, **publish to Production** and complete Google's brand
+   verification (requires a homepage URL, a privacy-policy URL, and domain verification, since
+   `calendar.events` is a sensitive scope). While in *Testing*, only whitelisted test users can
+   sign in.
+3. Create an **OAuth 2.0 Client ID → Web application**. Under **Authorized JavaScript origins**,
+   add the exact origin the directory is served from (e.g. `https://your-host`, plus
+   `http://localhost:<port>` for local development). No redirect URI is needed.
+4. Copy the **Client ID** into **Settings → Google Calendar → OAuth Client ID**. The Client ID
+   is public (not a secret); no client secret is used. The token, your email, and the event
+   defaults are stored only in your browser's `localStorage`.
+
+> The app must be served over **HTTPS** (or `localhost`) for Google sign-in to work, and that
+> origin must match an authorized JavaScript origin on the OAuth client.
 
 ### Data Import
 

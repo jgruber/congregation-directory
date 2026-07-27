@@ -1,4 +1,4 @@
-const CACHE = 'cong-dir-v3';
+const CACHE = 'cong-dir-v4';
 
 // Static assets to pre-cache (not index.html — that uses network-first)
 const APP_SHELL = [
@@ -31,6 +31,13 @@ self.addEventListener('fetch', e => {
 
   // Always go to network for CSV fetches (authenticated, must be fresh)
   if (e.request.headers.has('authorization') || url.pathname.endsWith('/download')) {
+    return;
+  }
+
+  // Never cache Google auth/API traffic — always network, never stale
+  if (url.hostname === 'accounts.google.com' ||
+      url.hostname === 'oauth2.googleapis.com' ||
+      url.hostname === 'www.googleapis.com') {
     return;
   }
 

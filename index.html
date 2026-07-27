@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     /* Theme CSS variables */
     :root                { --p:#3b82f6; --ph:#2563eb; --pl:#eff6ff; --pr:#93c5fd; }
@@ -391,6 +392,15 @@
                 </svg>
                 Print…
               </button>
+              <button onclick="openGcalModal(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Add Google Calendar Event…
+              </button>
               <button onclick="openPresetsModal(); closeToolMenus()"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
                        dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -660,6 +670,99 @@
   </div>
 </div>
 
+<!-- ═══════════════════════ GOOGLE CALENDAR EVENT MODAL ═══════════════════════ -->
+<div id="gcalModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
+  <div onclick="closeGcalModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div class="relative bg-white dark:bg-gray-900 w-full sm:max-w-md sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <div>
+        <h2 class="text-base font-semibold">Add Google Calendar Event</h2>
+        <p id="gcalSignedIn" class="text-xs text-gray-500 dark:text-gray-400"></p>
+      </div>
+      <button onclick="closeGcalModal()" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="overflow-y-auto px-5 py-5 space-y-4">
+      <p id="gcalInviteInfo" class="text-xs text-gray-500 dark:text-gray-400"></p>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Title</label>
+        <input type="text" id="gcalTitle"
+          class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                 bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Description</label>
+        <textarea id="gcalDescription" rows="2"
+          class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                 bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]"></textarea>
+      </div>
+
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-sm font-medium mb-1">Deadline date</label>
+          <input type="date" id="gcalDeadlineDate"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+        </div>
+        <div class="w-28">
+          <label class="block text-sm font-medium mb-1">Time</label>
+          <input type="time" id="gcalDeadlineTime"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <div class="w-28">
+          <label class="block text-sm font-medium mb-1">Duration (min)</label>
+          <input type="number" id="gcalDuration" min="5" step="5"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+        </div>
+        <div class="flex-1">
+          <label class="block text-sm font-medium mb-1">Email reminder — days before</label>
+          <input type="number" id="gcalRemindDays" min="0" step="1"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 -mt-2">The pre-deadline email reminder is sent to you (the organizer). Invitees get the invitation now plus their own default reminders.</p>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" id="gcalHideGuests" class="w-4 h-4 rounded accent-[var(--p)]">
+        <span class="text-sm">Hide the guest list (invitees can't see each other)</span>
+      </label>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Reference other cards <span class="text-gray-400 font-normal">(linked, not invited)</span></label>
+        <div class="relative">
+          <input type="text" id="gcalRefSearch" placeholder="Search people by name…" autocomplete="off"
+            oninput="onGcalRefSearch(this.value)"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+          <div id="gcalRefResults"
+            class="hidden absolute z-10 mt-1 w-full rounded-lg shadow-xl bg-white dark:bg-gray-900
+                   border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto"></div>
+        </div>
+        <div id="gcalRefChips" class="flex flex-wrap gap-2 mt-2"></div>
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <button onclick="closeGcalModal()"
+        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300
+               hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+      <button id="gcalCreateBtn" onclick="createCalendarEventForDisplayed()"
+        class="px-4 py-2 rounded-lg text-sm font-medium text-white btn-primary transition-colors disabled:opacity-50">
+        Create &amp; send invites</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════ SAVED FILTERS MODAL ═══════════════════════ -->
 <div id="presetsModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4">
   <div onclick="closePresetsModal()" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
@@ -883,6 +986,27 @@
             <span class="text-sm">Clear search text when tags removed</span>
           </label>
         </div>
+
+        <!-- Google Calendar -->
+        <div class="mt-5">
+          <p class="text-sm font-medium mb-2">Google Calendar</p>
+          <label class="text-sm text-gray-500 dark:text-gray-400 block mb-1">OAuth Client ID</label>
+          <input type="text" id="googleClientIdInput" placeholder="xxxxx.apps.googleusercontent.com"
+            autocomplete="off" spellcheck="false"
+            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+          <p class="text-xs text-gray-400 mt-1">
+            Enables “Add Google Calendar Event” in Actions. The Client ID is public (not a secret).
+            Create a Web-application OAuth client in Google Cloud with the Calendar API enabled and
+            this site's origin as an authorized JavaScript origin.
+          </p>
+          <div class="flex items-center gap-2 mt-2">
+            <span id="googleAuthStatus" class="text-xs text-gray-500 dark:text-gray-400 flex-1"></span>
+            <button id="googleSignOutBtn" type="button" onclick="googleAuth.signOut(); refreshGoogleAuthStatus()"
+              class="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-700
+                     hover:bg-gray-100 dark:hover:bg-gray-800 hidden">Sign out</button>
+          </div>
+        </div>
       </section>
 
       <!-- ── About ── -->
@@ -960,6 +1084,22 @@ const CUSTOM_TAGS_KEY = 'dir_custom_tags';
 const PRESETS_KEY  = 'dir_filter_presets';   // saved filter presets (localStorage)
 const NOTES_IDB_KEY = 'person_notes';        // per-person notes (IndexedDB kv)
 const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
+
+// ── Google Calendar integration ──
+// The Client ID is public (not a secret) and set per-install in Settings.
+const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
+const GCAL_EVENTS_URL     = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+const GCAL_MAX_REMINDER_MIN = 40320;   // Calendar API cap for reminder overrides (28 days)
+const DEFAULT_EVENT_DEFAULTS = {
+  title:            'Congregation visit',
+  description:      'Please review the linked directory card(s) and follow up before the deadline.',
+  dueInDays:        14,
+  deadlineTime:     '09:00',
+  durationMins:     30,
+  remindDaysBefore: 2,
+  hideGuestList:    true,
+};
 
 function dbLog(label, sql, params) {
   if (!DEBUG) return;
@@ -1094,6 +1234,10 @@ let settings = {
   clearSearchOnTagAdd:  true,
   clearSearchOnTagRemove: false,
   countryCode:          '1',
+  googleClientId:       '',            // Google OAuth Web client ID (public)
+  googleAuthorized:     false,         // has the user granted the Calendar scope at least once
+  googleToken:          null,          // { access_token, expires_at, email }
+  eventDefaults:        { ...DEFAULT_EVENT_DEFAULTS },
 };
 
 /* ─────────────────────────────────────────
@@ -1104,6 +1248,8 @@ function loadSettings() {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     Object.assign(settings, s);
     if (!settings.countryCode) settings.countryCode = '1';
+    // Deep-merge event defaults so new fields survive older stored settings
+    settings.eventDefaults = Object.assign({ ...DEFAULT_EVENT_DEFAULTS }, settings.eventDefaults || {});
   } catch(_) {}
 }
 
@@ -2242,6 +2388,299 @@ function smsAll() {
   window.open(`sms:${nums.join(',')}`, '_blank');
 }
 
+/* ─────────────────────────────────────────
+   GOOGLE CALENDAR — auth (browser token model)
+   State (token, email, authorized) lives in localStorage `settings`.
+───────────────────────────────────────── */
+function validEmail(e) { return !!e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e).trim()); }
+
+const googleAuth = {
+  _tokenClient: null,
+  _resolve: null,
+  _reject: null,
+
+  // Lazily create the GIS token client. Returns false if GIS isn't ready or no Client ID set.
+  _ensureClient() {
+    if (this._tokenClient) return true;
+    if (!(window.google && google.accounts && google.accounts.oauth2)) return false;
+    const cid = (settings.googleClientId || '').trim();
+    if (!cid) return false;
+    this._tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: cid,
+      scope: GCAL_SCOPES,
+      callback: (resp) => {
+        const resolve = this._resolve, reject = this._reject;
+        this._resolve = this._reject = null;
+        if (resp && resp.access_token) {
+          const ttl = (parseInt(resp.expires_in) || 3600) - 60;   // refresh 60s early
+          settings.googleAuthorized = true;
+          settings.googleToken = {
+            access_token: resp.access_token,
+            expires_at:   Date.now() + ttl * 1000,
+            email:        (settings.googleToken && settings.googleToken.email) || null,
+          };
+          saveSettings();
+          this._afterToken(resp.access_token).then(() => resolve && resolve(settings.googleToken));
+        } else if (reject) {
+          reject(new Error((resp && resp.error) || 'authorization_failed'));
+        }
+      },
+      error_callback: (err) => {
+        const reject = this._reject;
+        this._resolve = this._reject = null;
+        if (reject) reject(new Error((err && err.type) || 'authorization_failed'));
+      },
+    });
+    return true;
+  },
+
+  // Fetch the signed-in user's email for display / status.
+  async _afterToken(token) {
+    try {
+      const r = await fetch(GOOGLE_USERINFO_URL, { headers: { Authorization: 'Bearer ' + token } });
+      if (r.ok) {
+        const j = await r.json();
+        if (settings.googleToken) { settings.googleToken.email = j.email || null; saveSettings(); }
+      }
+    } catch (_) {}
+  },
+
+  // Return a valid cached token, or request a fresh one. First interactive
+  // request shows the consent screen; afterwards it refreshes silently.
+  async getToken({ interactive = false } = {}) {
+    const t = settings.googleToken;
+    if (t && t.access_token && t.expires_at && Date.now() < t.expires_at) return t;
+    if (!(window.google && google.accounts && google.accounts.oauth2)) {
+      throw new Error('gis_not_loaded');
+    }
+    if (!this._ensureClient()) throw new Error('no_client_id');
+    if (this._resolve) throw new Error('auth_in_progress');
+    const prompt = (interactive && !settings.googleAuthorized) ? 'consent' : '';
+    return new Promise((resolve, reject) => {
+      this._resolve = resolve; this._reject = reject;
+      try {
+        this._tokenClient.requestAccessToken({ prompt });
+      } catch (e) {
+        this._resolve = this._reject = null;
+        reject(e);
+      }
+    });
+  },
+
+  signOut() {
+    const t = settings.googleToken;
+    if (t && t.access_token && window.google && google.accounts && google.accounts.oauth2) {
+      try { google.accounts.oauth2.revoke(t.access_token, () => {}); } catch (_) {}
+    }
+    settings.googleToken = null;
+    settings.googleAuthorized = false;
+    saveSettings();
+  },
+};
+
+/* ─────────────────────────────────────────
+   GOOGLE CALENDAR — create-event dialog
+───────────────────────────────────────── */
+let gcalRefs = [];       // referenced (not invited) people: [{id, name}]
+let gcalBusy = false;
+
+function gcalDateInputValue(daysFromNow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (daysFromNow || 0));
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function openGcalModal() {
+  if (!currentPersons.length) { toast('No people in current results'); return; }
+  if (!settings.googleClientId) {
+    toast('Set your Google OAuth Client ID in Settings first');
+    openSettings();
+    return;
+  }
+  // Require a token (interactive) before showing the dialog.
+  googleAuth.getToken({ interactive: true }).then(() => {
+    const d = settings.eventDefaults || DEFAULT_EVENT_DEFAULTS;
+    document.getElementById('gcalTitle').value        = d.title || '';
+    document.getElementById('gcalDescription').value  = d.description || '';
+    document.getElementById('gcalDeadlineDate').value = gcalDateInputValue(d.dueInDays || 14);
+    document.getElementById('gcalDeadlineTime').value = d.deadlineTime || '09:00';
+    document.getElementById('gcalDuration').value     = d.durationMins || 30;
+    document.getElementById('gcalRemindDays').value   = d.remindDaysBefore != null ? d.remindDaysBefore : 2;
+    document.getElementById('gcalHideGuests').checked = d.hideGuestList !== false;
+    gcalRefs = [];
+    document.getElementById('gcalRefSearch').value = '';
+    document.getElementById('gcalRefResults').innerHTML = '';
+    document.getElementById('gcalRefResults').classList.add('hidden');
+    renderGcalRefChips();
+    updateGcalInviteInfo();
+    const who = settings.googleToken && settings.googleToken.email;
+    document.getElementById('gcalSignedIn').textContent = who ? `Signed in as ${who}` : '';
+    document.getElementById('gcalModal').classList.remove('hidden');
+  }).catch(err => {
+    console.error('Google auth failed:', err);
+    const msg = err && err.message === 'no_client_id' ? 'Set your Google OAuth Client ID in Settings first'
+      : err && err.message === 'gis_not_loaded' ? 'Google sign-in is still loading — try again in a moment'
+      : 'Google sign-in was cancelled or failed';
+    toast(msg);
+  });
+}
+
+function closeGcalModal() {
+  document.getElementById('gcalModal').classList.add('hidden');
+}
+
+function updateGcalInviteInfo() {
+  const withEmail = currentPersons.filter(p => validEmail(p.email));
+  const skipped = currentPersons.length - withEmail.length;
+  const el = document.getElementById('gcalInviteInfo');
+  el.textContent = skipped
+    ? `Inviting ${withEmail.length} of ${currentPersons.length} displayed — ${skipped} have no email and will be skipped.`
+    : `Inviting all ${withEmail.length} displayed ${withEmail.length === 1 ? 'person' : 'people'}.`;
+}
+
+// DB name search for the references picker (any person, not just the current filter).
+function gcalSearchPersons(term) {
+  if (!db || !term.trim()) return [];
+  const q = `'%${term.trim().replace(/'/g, "''")}%'`;
+  try {
+    const res = db.exec(
+      `SELECT id, display_name, first_name, last_name FROM persons
+       WHERE first_name LIKE ${q} OR last_name LIKE ${q} OR display_name LIKE ${q}
+       ORDER BY last_name, first_name LIMIT 8`);
+    if (!res.length) return [];
+    return res[0].values.map(row => {
+      const o = {}; res[0].columns.forEach((c, i) => o[c] = row[i]); return o;
+    }).map(p => ({ id: p.id, name: personFullName(p) }));
+  } catch (_) { return []; }
+}
+
+function onGcalRefSearch(term) {
+  const box = document.getElementById('gcalRefResults');
+  const matches = gcalSearchPersons(term).filter(m => !gcalRefs.some(r => r.id === m.id));
+  if (!matches.length) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  box.innerHTML = matches.map(m =>
+    `<button type="button" onclick="gcalAddRef(${m.id}, '${h(m.name).replace(/'/g, "\\'")}')"
+       class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">${h(m.name)}</button>`
+  ).join('');
+  box.classList.remove('hidden');
+}
+
+function gcalAddRef(id, name) {
+  if (!gcalRefs.some(r => r.id === id)) gcalRefs.push({ id, name });
+  document.getElementById('gcalRefSearch').value = '';
+  document.getElementById('gcalRefResults').innerHTML = '';
+  document.getElementById('gcalRefResults').classList.add('hidden');
+  renderGcalRefChips();
+}
+
+function gcalRemoveRef(id) {
+  gcalRefs = gcalRefs.filter(r => r.id !== id);
+  renderGcalRefChips();
+}
+
+function renderGcalRefChips() {
+  const box = document.getElementById('gcalRefChips');
+  if (!gcalRefs.length) { box.innerHTML = ''; return; }
+  box.innerHTML = gcalRefs.map(r =>
+    `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs
+       bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+       ${h(r.name)}
+       <button type="button" onclick="gcalRemoveRef(${r.id})" class="text-gray-400 hover:text-red-500">&times;</button>
+     </span>`
+  ).join('');
+}
+
+/* ─────────────────────────────────────────
+   GOOGLE CALENDAR — create the event (single POST)
+───────────────────────────────────────── */
+async function createCalendarEventForDisplayed() {
+  if (gcalBusy) return;
+  const withEmail = currentPersons.filter(p => validEmail(p.email));
+  if (!withEmail.length) { toast('None of the displayed people have an email address to invite'); return; }
+
+  const title    = document.getElementById('gcalTitle').value.trim() || 'Congregation visit';
+  const descText = document.getElementById('gcalDescription').value.trim();
+  const dateStr  = document.getElementById('gcalDeadlineDate').value;
+  const timeStr  = document.getElementById('gcalDeadlineTime').value || '09:00';
+  const duration = Math.max(5, parseInt(document.getElementById('gcalDuration').value) || 30);
+  const remindDays = Math.max(0, parseInt(document.getElementById('gcalRemindDays').value) || 0);
+  const hideGuests = document.getElementById('gcalHideGuests').checked;
+
+  if (!dateStr) { toast('Pick a deadline date'); return; }
+  const start = new Date(`${dateStr}T${timeStr}`);
+  if (isNaN(start.getTime())) { toast('Invalid deadline date/time'); return; }
+  const end = new Date(start.getTime() + duration * 60000);
+
+  // Persist edited values as the new standard defaults.
+  settings.eventDefaults = Object.assign({ ...settings.eventDefaults }, {
+    title, description: descText, deadlineTime: timeStr,
+    durationMins: duration, remindDaysBefore: remindDays, hideGuestList: hideGuests,
+  });
+  saveSettings();
+
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const refLines = gcalRefs.map(r => `${r.name}: ${location.origin}/?pid=${r.id}`);
+  const description = descText + (refLines.length ? `\n\nReferenced people:\n${refLines.join('\n')}` : '');
+  const reminderMin = Math.min(remindDays * 1440, GCAL_MAX_REMINDER_MIN);
+
+  const payload = {
+    summary: title,
+    description,
+    start: { dateTime: start.toISOString(), timeZone: tz },
+    end:   { dateTime: end.toISOString(),   timeZone: tz },
+    attendees: withEmail.map(p => ({ email: p.email })),
+    guestsCanSeeOtherGuests: !hideGuests,
+    guestsCanInviteOthers: false,
+    reminders: {
+      useDefault: false,
+      overrides: remindDays > 0 ? [{ method: 'email', minutes: reminderMin }] : [],
+    },
+  };
+
+  gcalBusy = true;
+  const btn = document.getElementById('gcalCreateBtn');
+  const origLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const event = await gcalPost(payload);
+    closeGcalModal();
+    const skipped = currentPersons.length - withEmail.length;
+    toast(`✅ Event created — invited ${withEmail.length}${skipped ? `, skipped ${skipped}` : ''}`);
+    settings.lastGcalEvent = { id: event.id, htmlLink: event.htmlLink || '' };
+    saveSettings();
+    if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener');
+  } catch (err) {
+    console.error('Calendar event creation failed:', err);
+    toast(`⚠️ ${err && err.message ? err.message : 'Failed to create event'}`);
+  } finally {
+    gcalBusy = false;
+    btn.disabled = false; btn.textContent = origLabel;
+  }
+}
+
+// POST the event, refreshing the token once on a 401.
+async function gcalPost(payload, retried) {
+  const tok = await googleAuth.getToken({ interactive: !retried });
+  const res = await fetch(`${GCAL_EVENTS_URL}?sendUpdates=all`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + tok.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401 && !retried) {
+    settings.googleToken = null; saveSettings();
+    return gcalPost(payload, true);
+  }
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const j = await res.json(); if (j.error && j.error.message) detail = j.error.message; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 function renderTagPanel(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -3130,7 +3569,23 @@ function openSettings() {
   document.getElementById('clearSearchOnTagAdd').checked    = !!settings.clearSearchOnTagAdd;
   document.getElementById('clearSearchOnTagRemove').checked = !!settings.clearSearchOnTagRemove;
   document.getElementById('countryCodeInput').value         = settings.countryCode || '';
+  document.getElementById('googleClientIdInput').value      = settings.googleClientId || '';
+  refreshGoogleAuthStatus();
   document.getElementById('settingsModal').classList.remove('hidden');
+}
+
+function refreshGoogleAuthStatus() {
+  const status = document.getElementById('googleAuthStatus');
+  const btn    = document.getElementById('googleSignOutBtn');
+  if (!status) return;
+  const email = settings.googleToken && settings.googleToken.email;
+  if (email) {
+    status.textContent = `Signed in as ${email}`;
+    btn && btn.classList.remove('hidden');
+  } else {
+    status.textContent = settings.googleClientId ? 'Not signed in' : '';
+    btn && btn.classList.add('hidden');
+  }
 }
 
 function closeSettings() {
@@ -3141,6 +3596,7 @@ function closeSettings() {
   settings.clearSearchOnTagAdd    = document.getElementById('clearSearchOnTagAdd').checked;
   settings.clearSearchOnTagRemove = document.getElementById('clearSearchOnTagRemove').checked;
   settings.countryCode            = document.getElementById('countryCodeInput').value.replace(/\D/g, '');
+  settings.googleClientId         = document.getElementById('googleClientIdInput').value.trim();
   saveSettings();
   setupAutoSync();
   document.getElementById('settingsModal').classList.add('hidden');
@@ -3232,6 +3688,14 @@ async function init() {
   }
   await loadPersonNotes();
   renderResults();
+
+  // Deep-link: ?pid=<id> opens that person's card (used by calendar-event links)
+  try {
+    const pid = new URLSearchParams(location.search).get('pid');
+    if (loaded && pid && /^\d+$/.test(pid)) {
+      setTimeout(() => openPersonDetail(parseInt(pid, 10)), 150);
+    }
+  } catch (_) {}
 
   // Auto-sync: run if overdue
   setupAutoSync();
