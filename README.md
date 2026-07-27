@@ -106,6 +106,11 @@ Calendar event on the signed-in user's own account and invites the currently dis
 - **Guest privacy** — by default the guest list is hidden so invitees can't see each other's
   email addresses.
 
+**End users never touch Google Cloud.** Signing in is a normal in-browser Google login
+(account picker → consent → done). The setup below is a **one-time job for whoever deploys the
+site** — the resulting Client ID is baked into `index.html` once and is invisible to everyone
+who uses the app.
+
 **One-time setup (done once by whoever hosts the app — not by each user)**
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create/select a project and
@@ -119,9 +124,15 @@ Calendar event on the signed-in user's own account and invites the currently dis
 3. Create an **OAuth 2.0 Client ID → Web application**. Under **Authorized JavaScript origins**,
    add the exact origin the directory is served from (e.g. `https://your-host`, plus
    `http://localhost:<port>` for local development). No redirect URI is needed.
-4. Copy the **Client ID** into **Settings → Google Calendar → OAuth Client ID**. The Client ID
-   is public (not a secret); no client secret is used. The token, your email, and the event
-   defaults are stored only in your browser's `localStorage`.
+4. Paste the **Client ID** into the `GOOGLE_CLIENT_ID` constant near the top of the script in
+   `index.html` (search for `GOOGLE_CLIENT_ID`). Once set, the Settings field disappears and
+   end users only ever see a "Sign in" step. The Client ID is public (not a secret); no client
+   secret is used. Each user's token, email, and event defaults are stored only in their own
+   browser's `localStorage`.
+
+   > If you'd rather not edit code (e.g. several people self-host their own copies), leave the
+   > constant blank and each host can paste their own Client ID into
+   > **Settings → Google Calendar → OAuth Client ID** instead.
 
 > The app must be served over **HTTPS** (or `localhost`) for Google sign-in to work, and that
 > origin must match an authorized JavaScript origin on the OAuth client.

@@ -990,15 +990,20 @@
         <!-- Google Calendar -->
         <div class="mt-5">
           <p class="text-sm font-medium mb-2">Google Calendar</p>
-          <label class="text-sm text-gray-500 dark:text-gray-400 block mb-1">OAuth Client ID</label>
-          <input type="text" id="googleClientIdInput" placeholder="xxxxx.apps.googleusercontent.com"
-            autocomplete="off" spellcheck="false"
-            class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
-                   bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
-          <p class="text-xs text-gray-400 mt-1">
-            Enables “Add Google Calendar Event” in Actions. The Client ID is public (not a secret).
-            Create a Web-application OAuth client in Google Cloud with the Calendar API enabled and
-            this site's origin as an authorized JavaScript origin.
+          <div id="googleClientIdRow">
+            <label class="text-sm text-gray-500 dark:text-gray-400 block mb-1">OAuth Client ID</label>
+            <input type="text" id="googleClientIdInput" placeholder="xxxxx.apps.googleusercontent.com"
+              autocomplete="off" spellcheck="false"
+              class="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--pr)]">
+            <p class="text-xs text-gray-400 mt-1">
+              Enables “Add Google Calendar Event” in Actions. The Client ID is public (not a secret).
+              Create a Web-application OAuth client in Google Cloud with the Calendar API enabled and
+              this site's origin as an authorized JavaScript origin.
+            </p>
+          </div>
+          <p id="googleConfiguredNote" class="text-xs text-gray-400 hidden">
+            Google Calendar is configured for this site. Just sign in to add events.
           </p>
           <div class="flex items-center gap-2 mt-2">
             <span id="googleAuthStatus" class="text-xs text-gray-500 dark:text-gray-400 flex-1"></span>
@@ -1086,7 +1091,11 @@ const NOTES_IDB_KEY = 'person_notes';        // per-person notes (IndexedDB kv)
 const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
 
 // ── Google Calendar integration ──
-// The Client ID is public (not a secret) and set per-install in Settings.
+// ONE-TIME DEPLOY STEP: paste this deployment's OAuth Web client ID below.
+// It is public (not a secret). Once set, end users NEVER see or enter it —
+// they just click "Add Google Calendar Event" and sign in through the browser.
+// Leave blank only if you want each self-hoster to enter their own in Settings.
+const GOOGLE_CLIENT_ID = '';   // e.g. '1234567890-abcdef.apps.googleusercontent.com'
 const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
 const GCAL_EVENTS_URL     = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
@@ -2394,6 +2403,10 @@ function smsAll() {
 ───────────────────────────────────────── */
 function validEmail(e) { return !!e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e).trim()); }
 
+// Effective Client ID: the baked-in deploy constant wins; the Settings field is
+// only a fallback for self-hosters who didn't edit the code.
+function googleClientId() { return (GOOGLE_CLIENT_ID || settings.googleClientId || '').trim(); }
+
 const googleAuth = {
   _tokenClient: null,
   _resolve: null,
@@ -2403,7 +2416,7 @@ const googleAuth = {
   _ensureClient() {
     if (this._tokenClient) return true;
     if (!(window.google && google.accounts && google.accounts.oauth2)) return false;
-    const cid = (settings.googleClientId || '').trim();
+    const cid = googleClientId();
     if (!cid) return false;
     this._tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: cid,
@@ -2494,8 +2507,8 @@ function gcalDateInputValue(daysFromNow) {
 
 function openGcalModal() {
   if (!currentPersons.length) { toast('No people in current results'); return; }
-  if (!settings.googleClientId) {
-    toast('Set your Google OAuth Client ID in Settings first');
+  if (!googleClientId()) {
+    toast('Google Calendar isn’t configured for this site yet');
     openSettings();
     return;
   }
@@ -3570,6 +3583,11 @@ function openSettings() {
   document.getElementById('clearSearchOnTagRemove').checked = !!settings.clearSearchOnTagRemove;
   document.getElementById('countryCodeInput').value         = settings.countryCode || '';
   document.getElementById('googleClientIdInput').value      = settings.googleClientId || '';
+  // When the Client ID is baked into the code, hide the field entirely — end
+  // users just sign in through the browser and never deal with a Client ID.
+  const bakedIn = !!GOOGLE_CLIENT_ID;
+  document.getElementById('googleClientIdRow').classList.toggle('hidden', bakedIn);
+  document.getElementById('googleConfiguredNote').classList.toggle('hidden', !bakedIn);
   refreshGoogleAuthStatus();
   document.getElementById('settingsModal').classList.remove('hidden');
 }
@@ -3583,7 +3601,7 @@ function refreshGoogleAuthStatus() {
     status.textContent = `Signed in as ${email}`;
     btn && btn.classList.remove('hidden');
   } else {
-    status.textContent = settings.googleClientId ? 'Not signed in' : '';
+    status.textContent = googleClientId() ? 'Not signed in' : '';
     btn && btn.classList.add('hidden');
   }
 }
