@@ -1,7 +1,7 @@
 {
   "name": "Congregation Directory",
   "short_name": "Directory",
-  "description": "Browse congregation members",
+  "description": "Search a congregation's member directory and create Google Calendar events that invite the members you select.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
