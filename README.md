@@ -37,7 +37,7 @@ A standalone, browser-based person directory search application built as a singl
 |---|---|
 | Congregation Status | Publisher, Baptized, Unbaptized Publisher, Associated Family, Active, Inactive, Field Service Group |
 | Appointment | Elder, Ministerial Servant, Regular Pioneer, Continuous Auxiliary Pioneer, Special Pioneer |
-| Family | Male, Female, Family Head, Family name |
+| Family | Male, Female, Family Head, Family name, Elder's Family, Ministerial Servant's Family, Pioneer's Family, Single Publisher Households |
 | Field Service Group | Field Service Group Overseer, Field Service Group Assistant |
 | OCLM / Student | OCLM Enrolled, Bible Reading, Initial Call, Follow Up, Making Disciples, Explaining Beliefs, Talks, Assistant |
 | Meeting Assignments | Midweek Chairman, Midweek Classroom Counselor, Prayer |

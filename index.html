@@ -1707,6 +1707,12 @@ async function importCSVText(csvText) {
   const fsGroups    = {};
   const movedIds    = new Set();
 
+  // Family-level rollups collected during Pass 2, consumed by Pass 3 to build
+  // the derived household tags (Elder's Family, Single Publisher Household, …).
+  const familyMembers    = {};  // familyId -> [person_id, …]
+  const familyHeadFlags  = {};  // familyId -> { elder, ms, pioneer }
+  const familyActivePubs = {};  // familyId -> count of active publishers
+
   // ── Pass 1: Field Service Groups, Families, Overseer/Assistant tags ──
   for (const row of rows) {
     const pid       = parseInt(row['PersonID']);
@@ -1873,6 +1879,24 @@ async function importCSVText(csvText) {
       parseFloat(row['Longitude'] || '') || null,
     ]);
 
+    // ── Family rollups (for the Pass 3 household tags) ──
+    if (effFamId > 0) {
+      (familyMembers[effFamId] ||= []).push(pid);
+      // An "active publisher" is a baptized or unbaptized publisher who is not
+      // marked inactive and has not moved away or been removed.
+      const activePublisher = (baptized === 1 || privilege === 'UBP')
+        && !inactive && !isMoved && row['Removed'] !== 'True';
+      if (activePublisher)
+        familyActivePubs[effFamId] = (familyActivePubs[effFamId] || 0) + 1;
+      if (row['FamilyHead'] === 'True') {
+        familyHeadFlags[effFamId] = {
+          elder:   elder === 1,
+          ms:      ms    === 1,
+          pioneer: pioneer === 1 || spPioneer === 1,
+        };
+      }
+    }
+
     // ── Generate tags ──
     // Field service group
     if (effFsgId > 0) {
@@ -2006,6 +2030,27 @@ async function importCSVText(csvText) {
   }
 
   persStmt.free();
+
+  // ── Pass 3: Household tags derived from the family as a whole ──
+  // Every member of the family receives the tag, so filtering by it returns the
+  // whole household rather than just the head.
+  for (const famIdStr of Object.keys(familyMembers)) {
+    const famId   = parseInt(famIdStr);
+    const members = familyMembers[famId];
+    const famName = families[famId] ? families[famId].name : '';
+    const head    = familyHeadFlags[famId];
+    const addTag  = name => {
+      for (const pid of members)
+        tags.push({ person_id: pid, type: 'family', name, value: famName });
+    };
+
+    if (head) {
+      if (head.elder)   addTag("Elder's Family");
+      if (head.ms)      addTag("Ministerial Servant's Family");
+      if (head.pioneer) addTag("Pioneer's Family");
+    }
+    if ((familyActivePubs[famId] || 0) === 1) addTag('Single Publisher Households');
+  }
 
   // Insert tags in one transaction
   db.run('BEGIN');
