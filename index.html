@@ -428,6 +428,15 @@
                 </svg>
                 vCards
               </button>
+              <button onclick="downloadContactsCsv(); closeToolMenus()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
+                       dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 10h18M3 14h18M10 6v12M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/>
+                </svg>
+                Export CSV
+              </button>
               <button onclick="openPrintModal(); closeToolMenus()"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700
                        dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -2464,6 +2473,40 @@ function downloadAllVCards() {
   triggerDownload(vcf, 'directory.vcf', 'text/vcard');
 }
 
+/* ─────────────────────────────────────────
+   CSV EXPORT
+───────────────────────────────────────── */
+const CSV_COLUMNS = [
+  ['First Name',           p => p.first_name],
+  ['Last Name',            p => p.last_name],
+  ['Mobile',               p => p.mobile],
+  ['Email',                p => p.email],
+  ['Address',              p => p.address || (!p.city && p.full_address) || ''],
+  ['City',                 p => p.city],
+  ['State',                p => p.state],
+  ['Postal Code',          p => p.postal_code],
+  ['Family',               p => p.family_name],
+  ['Field Service Group',  p => p.field_service_group_name],
+  ['Date of Birth',        p => p.date_of_birth],
+  ['Date of Baptism',      p => p.date_of_baptism],
+];
+
+function downloadContactsCsv() {
+  if (!currentPersons.length) { toast('No people in current results'); return; }
+  const cell = v => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = [CSV_COLUMNS.map(([label]) => label),
+                ...currentPersons.map(p => CSV_COLUMNS.map(([, get]) => get(p)))];
+  const csv = rows.map(r => r.map(cell).join(',')).join('\r\n');
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_` +
+                `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  // Leading BOM so Excel opens the file as UTF-8
+  triggerDownload('﻿' + csv, `contacts_${stamp}.csv`, 'text/csv;charset=utf-8');
+}
+
 function closeToolMenus() {
   ['analyzeMenu','actionsMenu'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
@@ -4017,6 +4060,7 @@ window.removeTagFilter   = removeTagFilter;
 window.clearAgeFilter    = clearAgeFilter;
 window.downloadVCard     = downloadVCard;
 window.downloadAllVCards = downloadAllVCards;
+window.downloadContactsCsv = downloadContactsCsv;
 window.emailAll          = emailAll;
 window.openPersonDetail  = openPersonDetail;
 window.clearFsgFilter    = clearFsgFilter;
