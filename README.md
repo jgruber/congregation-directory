@@ -80,6 +80,7 @@ Accessed via the **Actions** menu (operates on the current results):
 - **Email All / Text All** — open a pre-addressed email or SMS.
 - **Copy Emails / Copy Phone Numbers** — copy the current list to the clipboard for pasting into other tools.
 - **vCards** — download contacts.
+- **Export CSV** — download a `contacts_[date_time].csv` spreadsheet with name, contact information, family, field service group, date of birth and date of baptism.
 - **Print…** — choose a **Directory** table, per-group **FSG Contact Sheets** (one page per group), or a household **Address List**.
 - **Add Google Calendar Event…** — create one Google Calendar event on your own account that **invites every displayed person** (those with an email address) as attendees. See [Google Calendar Integration](#google-calendar-integration) below.
 - **Saved Filters…** — name and store the current filter/search combination, then re-apply it in one click later. Presets are saved in browser `localStorage`.
