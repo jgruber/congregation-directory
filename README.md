@@ -59,6 +59,8 @@ Each person is displayed as a card showing:
 
 Tap or click any card to open a **detail modal** showing full contact information, all tags organised by category, and biographical details.
 
+- **Emergency contacts** — the detail modal lists each person's emergency contacts in the congregation's order: name, relationship, and tap-to-call / email links. They come from the persons-uploader server's `Emergency-Contacts.csv` (its notes are never stored).
+
 - **Sort & group** — a control in the results header sorts cards by name or age, or groups them by field service group or family.
 - **Per-person notes** — the detail modal has a free-text **Notes** field. Notes are stored locally in your browser (IndexedDB), kept separate from the imported CSV so they survive re-imports. A 📝 marker appears on cards that have a note.
 
@@ -151,11 +153,12 @@ who uses the app.
 - Click **Fetch Now** to import immediately.
 - Set an **Auto-sync interval** (hourly, 6-hourly, daily, or weekly) to have the app check for updates automatically on startup.
 - The URL can target a deployment of [persons-uploader](https://github.com/jgruber/persons-uploader), a companion app that serves the latest `Persons.csv` export over HTTP.
+- A sync also fetches `/download?tags` (custom tags) and `/download?emergency_contacts` (emergency contacts). If the emergency contacts cannot be fetched, the previous ones are kept.
 
 ### Database
 
 - The SQLite database is stored entirely in your browser's **IndexedDB** — it persists across page reloads without any server.
-- The schema is identical to the one produced by `syncPersons.py`, with tables: `congregations`, `field_service_groups`, `families`, `persons`, and `tags`.
+- The schema is identical to the one produced by `syncPersons.py`, with tables: `congregations`, `field_service_groups`, `families`, `persons`, `tags`, and `emergency_contacts` (`person_id` → `persons.id`, `contact_order`, `name`, `relationship`, `email`, `mobile`, `phone`).
 - **Export .db File** — download the database as a standard `.db` file compatible with any SQLite tool.
 - **Clear Database** — permanently remove all data from the browser.
 

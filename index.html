@@ -1514,6 +1514,18 @@ function createSchema() {
     CREATE INDEX IF NOT EXISTS idx_tags_pid  ON tags(person_id);
     CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
     CREATE INDEX IF NOT EXISTS idx_persons_name ON persons(last_name, first_name);
+    -- Emergency contacts from the uploader's /download?emergency_contacts, in their order.
+    CREATE TABLE IF NOT EXISTS emergency_contacts (
+      id             INTEGER PRIMARY KEY,
+      person_id      INTEGER NOT NULL REFERENCES persons(id),
+      contact_order  INTEGER NOT NULL,
+      name           TEXT,
+      relationship   TEXT,
+      email          TEXT,
+      mobile         TEXT,
+      phone          TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_emergency_person ON emergency_contacts(person_id, contact_order);
   `);
 }
 
@@ -1536,6 +1548,7 @@ async function loadDbFromStorage() {
     // Migrations: add columns that may be missing from older schemas
     try { db.run(`ALTER TABLE persons ADD COLUMN latitude REAL`);  } catch(e) {}
     try { db.run(`ALTER TABLE persons ADD COLUMN longitude REAL`); } catch(e) {}
+    createSchema();   // adds tables an older stored database lacks (e.g. emergency_contacts)
     return true;
   } catch(e) {
     console.error('DB load failed:', e);
@@ -3117,6 +3130,29 @@ function openPersonDetail(pid) {
   if (p.full_address && p.full_address.trim()) contacts.push(`<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.full_address)}" target="_blank" rel="noopener" class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><span class="text-xl">📍</span><span class="text-sm text-primary">${h(p.full_address)}</span></a>`);
   if (contacts.length) html += `<div class="space-y-2">${contacts.join('')}</div>`;
 
+  // Emergency contacts, in the order the congregation recorded them
+  const emergency = getEmergencyContacts(pid);
+  if (emergency.length) {
+    const link = (href, text, cls = 'text-primary') =>
+      `<a href="${h(href)}" class="${cls} hover:underline">${h(text)}</a>`;
+    html += `<div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Emergency contacts</p>
+      <div class="space-y-2">` +
+      emergency.map(c => {
+        const ways = [];
+        if (c.mobile) ways.push(`📱 ${link('tel:' + c.mobile, c.mobile)}`);
+        if (c.phone)  ways.push(`📞 ${link('tel:' + c.phone, c.phone)}`);
+        if (c.email)  ways.push(`✉️ ${link('mailto:' + c.email, c.email, 'text-primary break-all')}`);
+        return `
+        <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40">
+          <div class="text-sm font-medium">${h(c.name || '(no name)')}${
+            c.relationship ? ` <span class="text-xs font-normal text-gray-500">· ${h(c.relationship)}</span>` : ''}</div>
+          ${ways.length ? `<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">${ways.join('')}</div>` : ''}
+        </div>`;
+      }).join('') +
+      `</div></div>`;
+  }
+
   // Info grid
   const info = [];
   if (p.field_service_group_name) info.push(['Field Service Group', p.field_service_group_name]);
@@ -3605,6 +3641,50 @@ function syncDarkModeUI() {
 /* ─────────────────────────────────────────
    URL FETCH
 ───────────────────────────────────────── */
+/* ─────────────────────────────────────────
+   EMERGENCY CONTACTS
+───────────────────────────────────────── */
+function readEmergencyContacts() {
+  if (!db) return [];
+  try {
+    const res = db.exec(`SELECT person_id, contact_order, name, relationship, email, mobile, phone
+                           FROM emergency_contacts`);
+    if (!res.length) return [];
+    return res[0].values.map(([person_id, contact_order, name, relationship, email, mobile, phone]) =>
+      ({ person_id, contact_order, name, relationship, email, mobile, phone }));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Replace the table with these contacts, keeping only those whose person is in the directory.
+function storeEmergencyContacts(contacts) {
+  db.run('DELETE FROM emergency_contacts');
+  const res = db.exec('SELECT id FROM persons');
+  const known = new Set(res.length ? res[0].values.map(r => r[0]) : []);
+  db.run('BEGIN');
+  const stmt = db.prepare(`INSERT INTO emergency_contacts
+    (person_id, contact_order, name, relationship, email, mobile, phone) VALUES (?,?,?,?,?,?,?)`);
+  let stored = 0;
+  for (const c of contacts) {
+    if (!known.has(c.person_id)) continue;
+    stmt.run([c.person_id, c.contact_order ?? 0, c.name || '', c.relationship || '',
+              c.email || '', c.mobile || '', c.phone || '']);
+    stored++;
+  }
+  stmt.free();
+  db.run('COMMIT');
+  return stored;
+}
+
+function getEmergencyContacts(pid) {
+  const res = db.exec(`SELECT name, relationship, email, mobile, phone FROM emergency_contacts
+                        WHERE person_id = ? ORDER BY contact_order, id`, [pid]);
+  if (!res.length) return [];
+  return res[0].values.map(([name, relationship, email, mobile, phone]) =>
+    ({ name, relationship, email, mobile, phone }));
+}
+
 async function fetchCSVFromURL(statusElId) {
   const url  = document.getElementById('csvUrlInput').value.trim() || settings.csvUrl;
   const user = document.getElementById('csvUsernameInput').value.trim() || settings.csvUsername || '';
@@ -3613,11 +3693,12 @@ async function fetchCSVFromURL(statusElId) {
   if (!url) { toast('Please enter a URL'); return; }
 
   // Normalize to origin + /download regardless of what path the user typed
-  let csvUrl, tagsUrl;
+  let csvUrl, tagsUrl, emergencyUrl;
   try {
     const origin = new URL(url).origin;
     csvUrl  = origin + '/download';
     tagsUrl = origin + '/download?tags';
+    emergencyUrl = origin + '/download?emergency_contacts';
   } catch(e) {
     toast('Invalid URL'); return;
   }
@@ -3633,6 +3714,7 @@ async function fetchCSVFromURL(statusElId) {
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
     const text  = await res.text();
+    const previousEmergency = readEmergencyContacts();
     const count = await importCSVText(text);
 
     settings.lastSync = new Date().toISOString();
@@ -3640,6 +3722,21 @@ async function fetchCSVFromURL(statusElId) {
     settings.csvUsername = user;
     settings.csvPassword = pass;
     saveSettings();
+
+    // Emergency contacts from <origin>/download?emergency_contacts. The CSV import above
+    // rebuilt the database, so put back the previous contacts if this fetch fails.
+    let emergencyStored = null;
+    try {
+      if (statusEl) statusEl.textContent = '⏳ Fetching emergency contacts…';
+      const emRes = await fetch(emergencyUrl, { headers });
+      if (emRes.ok) emergencyStored = storeEmergencyContacts(await emRes.json());
+      else if (emRes.status === 404) emergencyStored = storeEmergencyContacts([]);
+      else throw new Error(`HTTP ${emRes.status}`);
+    } catch(e) {
+      console.warn('[Emergency] Fetch failed, keeping the previous contacts:', e.message);
+      storeEmergencyContacts(previousEmergency);
+    }
+    await persistDb();
 
     // Fetch custom tags from <origin>/download?tags
     let tagsImported = 0;
