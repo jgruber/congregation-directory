@@ -1310,6 +1310,9 @@ let settings = {
   darkMode:             window.matchMedia('(prefers-color-scheme: dark)').matches,
   theme:                'blue',
   lastSync:             null,
+  // persons-uploader's /download?version from the last complete sync, and the
+  // server it came from; an auto-sync with the same version skips the downloads
+  dataVersion:          null,   // { origin, version }
   clearSearchOnTagAdd:  true,
   clearSearchOnTagRemove: false,
   countryCode:          '1',
@@ -3727,10 +3730,11 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
   if (!url) { toast('Please enter a URL'); return; }
 
   // Normalize to origin + /download regardless of what path the user typed
-  let csvUrl, tagsUrl, emergencyUrl;
+  let origin, csvUrl, tagsUrl, emergencyUrl, versionUrl;
   try {
-    const origin = new URL(url).origin;
+    origin  = new URL(url).origin;
     csvUrl  = origin + '/download';
+    versionUrl = origin + '/download?version';
     tagsUrl = origin + '/download?tags';
     emergencyUrl = origin + '/download?emergency_contacts';
   } catch(e) {
@@ -3744,6 +3748,18 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
     const headers = {};
     if (user || pass) headers['Authorization'] = 'Basic ' + btoa(`${user}:${pass}`);
 
+    // Ask the server whether anything changed since the last complete sync. Auto-syncs
+    // stop here when nothing has; Fetch Now always downloads. Older servers without
+    // ?version just mean a full sync.
+    const version = await fetchDataVersion(versionUrl, headers);
+    if (auto && version && settings.dataVersion &&
+        settings.dataVersion.origin === origin && settings.dataVersion.version === version) {
+      settings.lastSync = new Date().toISOString();
+      saveSettings();
+      if (statusEl) statusEl.textContent = '✓ Already up to date';
+      return;
+    }
+
     const res = await fetchWithTimeout(csvUrl, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
@@ -3755,11 +3771,13 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
     settings.csvUrl      = url;
     settings.csvUsername = user;
     settings.csvPassword = pass;
+    settings.dataVersion = null;   // set below only if every part of the sync succeeds
     saveSettings();
 
     // Emergency contacts from <origin>/download?emergency_contacts. The CSV import above
     // rebuilt the database, so put back the previous contacts if this fetch fails.
     let emergencyStored = null;
+    let complete = true;
     try {
       if (statusEl) statusEl.textContent = '⏳ Fetching emergency contacts…';
       const emRes = await fetchWithTimeout(emergencyUrl, { headers });
@@ -3769,6 +3787,7 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
     } catch(e) {
       console.warn('[Emergency] Fetch failed, keeping the previous contacts:', e.message);
       storeEmergencyContacts(previousEmergency);
+      complete = false;
     }
     await persistDb();
 
@@ -3777,6 +3796,7 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
     try {
       if (statusEl) statusEl.textContent = '⏳ Fetching tags…';
       const tagsRes = await fetchWithTimeout(tagsUrl, { headers });
+      if (!tagsRes.ok && tagsRes.status !== 404) complete = false;
       if (tagsRes.ok) {
         // Flatten so bundled multi-tag files (stored as a nested array) import too.
         const tagList = flattenTagData(await tagsRes.json());
@@ -3791,6 +3811,14 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
       }
     } catch(e) {
       console.warn('[Tags] Tags fetch skipped:', e.message);
+      complete = false;
+    }
+
+    // Remember what was synced, so the next auto-sync can skip an unchanged server.
+    // A partial sync leaves it unset and the next one downloads everything again.
+    if (version && complete) {
+      settings.dataVersion = { origin, version };
+      saveSettings();
     }
 
     loadAvailTags();
@@ -3818,6 +3846,20 @@ async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
     const msg = `Error: ${e.message}`;
     if (statusEl) statusEl.textContent = msg;
     toast(msg);
+  }
+}
+
+// persons-uploader's fingerprint of everything a sync downloads, or null if the
+// server doesn't support it (an older server answers ?version with Persons.csv).
+// Network errors propagate so an offline auto-sync stays quiet.
+async function fetchDataVersion(versionUrl, headers) {
+  const res = await fetchWithTimeout(versionUrl, { headers });
+  if (!res.ok) return null;
+  try {
+    const body = await res.json();
+    return typeof body.version === 'string' && body.version ? body.version : null;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -3953,6 +3995,7 @@ async function clearDb() {
   });
   await idbDelete(DB_KEY);
   settings.lastSync = null;
+  settings.dataVersion = null;
   saveSettings();
   renderResults();
   renderTagPanel('tagPanelDesktop');
@@ -4140,6 +4183,7 @@ async function init() {
       const text  = await file.text();
       const count = await importCSVText(text);
       settings.lastSync = new Date().toISOString();
+      settings.dataVersion = null;   // no longer the server's data
       saveSettings();
       loadAvailTags();
       loadSelectOptions();

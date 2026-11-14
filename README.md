@@ -11,7 +11,7 @@ A standalone, browser-based person directory search application built as a singl
 3. Under **Data Import**, upload your `Persons.csv` file or configure a URL to fetch it from.
 4. The directory loads and is ready to search.
 
-> **Note:** The browser needs an internet connection on first load. After that the app and its data are stored on the device, so it opens and searches offline. When auto-sync is on, the app syncs at startup, when the connection comes back and when it is reopened, but only once the sync interval has passed; with no connection it keeps the stored data.
+> **Note:** The browser needs an internet connection on first load. After that the app and its data are stored on the device, so it opens and searches offline. When auto-sync is on, the app syncs at startup, when the connection comes back and when it is reopened, but only once the sync interval has passed; with no connection it keeps the stored data. Each automatic sync first asks the server for `/download?version` (persons-uploader 1.7.0+) and skips the downloads when nothing has changed since the last complete sync; **Fetch Now** always downloads everything.
 
 ### Releasing updates
 
