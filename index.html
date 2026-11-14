@@ -17,7 +17,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Directory">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- sw.js precaches these exact URLs for offline use: keep its CDN_ASSETS in step.
+       Tailwind's CDN sends no CORS headers, so it is loaded (and cached) without crossorigin. -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"
           crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
@@ -1126,6 +1128,15 @@
 </div>
 
 <!-- Toast -->
+<!-- Shown when a new version of the app has been downloaded (see registerServiceWorker) -->
+<div id="updateBanner"
+  class="hidden fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3
+         pl-4 pr-2 py-2 rounded-xl text-sm font-medium shadow-xl whitespace-nowrap
+         bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900">
+  <span>Update available</span>
+  <button id="updateReloadBtn" class="px-3 py-1 rounded-lg text-white btn-primary">Reload</button>
+</div>
+
 <div id="toast"
   class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[60]
          px-5 py-2.5 rounded-xl text-sm font-medium shadow-xl
@@ -3687,7 +3698,28 @@ function getEmergencyContacts(pid) {
     ({ name, relationship, email, mobile, phone }));
 }
 
-async function fetchCSVFromURL(statusElId) {
+// fetch() with a time limit, so a weak signal fails over to the stored data
+// instead of hanging. Rejects with an AbortError on timeout.
+async function fetchWithTimeout(url, options = {}, ms = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Network failures (offline, timeout) rather than server errors
+function isNetworkError(e) {
+  return e && (e.name === 'AbortError' || e.name === 'TypeError');
+}
+
+// auto: a background sync (startup, timer, back online, app resumed). It is skipped
+// while the browser reports being offline and fails quietly on network errors,
+// leaving the stored data in place.
+async function fetchCSVFromURL(statusElId, { auto = false } = {}) {
+  if (auto && !navigator.onLine) return;
   const url  = document.getElementById('csvUrlInput').value.trim() || settings.csvUrl;
   const user = document.getElementById('csvUsernameInput').value.trim() || settings.csvUsername || '';
   const pass = document.getElementById('csvPasswordInput').value || settings.csvPassword || '';
@@ -3712,7 +3744,7 @@ async function fetchCSVFromURL(statusElId) {
     const headers = {};
     if (user || pass) headers['Authorization'] = 'Basic ' + btoa(`${user}:${pass}`);
 
-    const res = await fetch(csvUrl, { headers });
+    const res = await fetchWithTimeout(csvUrl, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
     const text  = await res.text();
@@ -3730,7 +3762,7 @@ async function fetchCSVFromURL(statusElId) {
     let emergencyStored = null;
     try {
       if (statusEl) statusEl.textContent = '⏳ Fetching emergency contacts…';
-      const emRes = await fetch(emergencyUrl, { headers });
+      const emRes = await fetchWithTimeout(emergencyUrl, { headers });
       if (emRes.ok) emergencyStored = storeEmergencyContacts(await emRes.json());
       else if (emRes.status === 404) emergencyStored = storeEmergencyContacts([]);
       else throw new Error(`HTTP ${emRes.status}`);
@@ -3744,7 +3776,7 @@ async function fetchCSVFromURL(statusElId) {
     let tagsImported = 0;
     try {
       if (statusEl) statusEl.textContent = '⏳ Fetching tags…';
-      const tagsRes = await fetch(tagsUrl, { headers });
+      const tagsRes = await fetchWithTimeout(tagsUrl, { headers });
       if (tagsRes.ok) {
         // Flatten so bundled multi-tag files (stored as a nested array) import too.
         const tagList = flattenTagData(await tagsRes.json());
@@ -3775,6 +3807,14 @@ async function fetchCSVFromURL(statusElId) {
     if (statusEl) statusEl.textContent = `✓ Imported ${count} persons${tagMsg}`;
     toast(`Imported ${count} persons${tagMsg} from URL`);
   } catch(e) {
+    if (isNetworkError(e)) {
+      const since = settings.lastSync ? ` — showing data from ${new Date(settings.lastSync).toLocaleString()}` : '';
+      const msg = `Can't reach the server${since}`;
+      if (statusEl) statusEl.textContent = msg;
+      if (auto) { console.warn('[Sync] Skipped, network unavailable:', e.message); return; }
+      toast(msg);
+      return;
+    }
     const msg = `Error: ${e.message}`;
     if (statusEl) statusEl.textContent = msg;
     toast(msg);
@@ -3784,8 +3824,20 @@ async function fetchCSVFromURL(statusElId) {
 function setupAutoSync() {
   if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
   if (settings.autoSyncInterval > 0 && settings.csvUrl) {
-    autoSyncTimer = setInterval(() => fetchCSVFromURL('fetchStatus'), settings.autoSyncInterval);
+    autoSyncTimer = setInterval(() => fetchCSVFromURL('fetchStatus', { auto: true }), settings.autoSyncInterval);
   }
+}
+
+// Sync now if auto-sync is on and the last sync is older than its interval.
+// Runs at startup, when the connection comes back and when the app is resumed.
+let autoSyncRunning = false;
+async function syncIfOverdue() {
+  if (autoSyncRunning || !settings.csvUrl || !(settings.autoSyncInterval > 0)) return;
+  const last = settings.lastSync ? new Date(settings.lastSync).getTime() : 0;
+  if (Date.now() - last <= settings.autoSyncInterval) return;
+  autoSyncRunning = true;
+  try { await fetchCSVFromURL('fetchStatus', { auto: true }); }
+  finally { autoSyncRunning = false; }
 }
 
 /* ─────────────────────────────────────────
@@ -3952,12 +4004,17 @@ async function init() {
     }
   } catch (_) {}
 
-  // Auto-sync: run if overdue
+  // Auto-sync: run if overdue, now and whenever the connection or the app comes back
   setupAutoSync();
-  if (settings.csvUrl && settings.autoSyncInterval > 0 && settings.lastSync) {
-    if (Date.now() - new Date(settings.lastSync).getTime() > settings.autoSyncInterval) {
-      fetchCSVFromURL('fetchStatus');
-    }
+  syncIfOverdue();
+  window.addEventListener('online', syncIfOverdue);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncIfOverdue();
+  });
+  if (!navigator.onLine && loaded) {
+    toast(settings.lastSync
+      ? `Offline — showing data from ${new Date(settings.lastSync).toLocaleString()}`
+      : 'Offline — showing stored data');
   }
 
   // ── Event listeners ──
@@ -4179,9 +4236,47 @@ window.deleteCustomTag   = deleteCustomTag;
 
 init().catch(console.error);
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
+/* ─────────────────────────────────────────
+   APP UPDATES
+   sw.js precaches this version of the app so it runs offline. A changed sw.js
+   (bump its VERSION on release) installs in the background and waits; the
+   banner lets the user switch to it, which reloads the page.
+───────────────────────────────────────── */
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const reg = await navigator.serviceWorker.register('./sw.js');
+
+  // Only offer an update when a previous version is running; the first install
+  // has nothing to replace.
+  const offer = worker => {
+    if (!worker || !navigator.serviceWorker.controller) return;
+    document.getElementById('updateBanner').classList.remove('hidden');
+    document.getElementById('updateReloadBtn').onclick = () =>
+      worker.postMessage({ type: 'SKIP_WAITING' });
+  };
+  const track = worker => worker.addEventListener('statechange', () => {
+    if (worker.state === 'installed') offer(worker);
+  });
+  if (reg.waiting) offer(reg.waiting);
+  else if (reg.installing) track(reg.installing);   // update already underway at registration
+  reg.addEventListener('updatefound', () => track(reg.installing));
+
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
+  // The browser checks for a new sw.js on each launch; also check when an
+  // installed app is resumed or comes back online, since those rarely relaunch.
+  const check = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+  window.addEventListener('online', check);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
 }
+registerServiceWorker().catch(e => console.warn('[SW] Registration failed:', e));
 
 // ── Map Modal ─────────────────────────────────────────────────────────────────
 let _map = null;

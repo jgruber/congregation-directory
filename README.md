@@ -11,7 +11,11 @@ A standalone, browser-based person directory search application built as a singl
 3. Under **Data Import**, upload your `Persons.csv` file or configure a URL to fetch it from.
 4. The directory loads and is ready to search.
 
-> **Note:** Because sql.js and Tailwind are loaded from CDN, the browser needs an internet connection on first load. After the initial load, all data is stored locally.
+> **Note:** The browser needs an internet connection on first load. After that the app and its data are stored on the device, so it opens and searches offline. When auto-sync is on, the app syncs at startup, when the connection comes back and when it is reopened, but only once the sync interval has passed; with no connection it keeps the stored data.
+
+### Releasing updates
+
+The service worker (`sw.js`) precaches the app and its CDN libraries (`CDN_ASSETS`, pinned versions) on each device so the installed app works offline. `index.html` is fetched network-first, so page changes reach users the next time they open the app online. When `sw.js` changes — including a library upgrade, which must change the URL in both `index.html` and `CDN_ASSETS` — bump `VERSION` in `sw.js`: the new version downloads in the background and the app shows **Update available — Reload**.
 
 ---
 
@@ -321,10 +325,11 @@ duty: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
 
 | Component | Technology |
 |---|---|
-| UI framework | [Tailwind CSS](https://tailwindcss.com) (Play CDN) |
+| UI framework | [Tailwind CSS](https://tailwindcss.com) 3.4.17 (Play CDN) |
 | Database engine | [sql.js](https://sql.js.org) 1.10.2 (SQLite compiled to WebAssembly) |
 | Persistence | Browser IndexedDB |
 | Dependencies | None — single HTML file, CDN only |
+| Offline | Service worker precaches the app shell and CDN libraries; data lives in IndexedDB |
 
 ### Browser Compatibility
 
