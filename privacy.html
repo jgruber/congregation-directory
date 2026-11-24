@@ -78,9 +78,10 @@
       <p>When you choose to create a calendar event, the app requests these Google OAuth scopes:</p>
       <ul>
         <li>
-          <code>https://www.googleapis.com/auth/calendar.events</code> — used solely to create the
-          calendar event you configure and to send the invitations you request. The app does not
-          read, modify, or delete your other calendar events.
+          <code>https://www.googleapis.com/auth/calendar.events.owned</code> — used solely to create
+          the calendar event you configure on your own primary calendar and to send the invitations
+          you request. The app does not read, modify, or delete your other calendar events, and has
+          no access to calendars you don't own.
         </li>
         <li>
           <code>https://www.googleapis.com/auth/userinfo.email</code> — used only to show which

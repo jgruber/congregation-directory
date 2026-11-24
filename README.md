@@ -11,6 +11,8 @@ A standalone, browser-based person directory search application built as a singl
 3. Under **Data Import**, upload your `Persons.csv` file or configure a URL to fetch it from.
 4. The directory loads and is ready to search.
 
+To try the app without real data, click **Or try it with sample data** on the start screen. It loads `demo/sample-persons.csv`: 12 fictitious people with `example.com` email addresses.
+
 > **Note:** The browser needs an internet connection on first load. After that the app and its data are stored on the device, so it opens and searches offline. When auto-sync is on, the app syncs at startup, when the connection comes back and when it is reopened, but only once the sync interval has passed; with no connection it keeps the stored data. Each automatic sync first asks the server for `/download?version` (persons-uploader 1.7.0+) and skips the downloads when nothing has changed since the last complete sync; **Fetch Now** always downloads everything.
 
 ### Releasing updates
@@ -123,10 +125,11 @@ who uses the app.
 1. In [Google Cloud Console](https://console.cloud.google.com/), create/select a project and
    **enable the Google Calendar API**.
 2. Configure the **OAuth consent screen** (User type: External) and add the scopes
-   `.../auth/calendar.events` and `.../auth/userinfo.email`. To let any Google user sign in
+   `.../auth/calendar.events.owned` and `.../auth/userinfo.email` (they must match `GCAL_SCOPES`
+   in `index.html` exactly). To let any Google user sign in
    without an "unverified app" warning, **publish to Production** and complete Google's brand
    verification (requires a homepage URL, a privacy-policy URL, and domain verification, since
-   `calendar.events` is a sensitive scope). While in *Testing*, only whitelisted test users can
+   `calendar.events.owned` is a sensitive scope). While in *Testing*, only whitelisted test users can
    sign in.
 3. Create an **OAuth 2.0 Client ID → Web application**. Under **Authorized JavaScript origins**,
    add the exact origin the directory is served from (e.g. `https://your-host`, plus

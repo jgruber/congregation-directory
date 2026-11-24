@@ -249,7 +249,7 @@
             <p class="mt-1.5 text-gray-600 dark:text-gray-300">
               The optional “Add Google Calendar Event” feature signs you in with Google and creates a
               single calendar event that invites the people you selected. It requests only
-              <code>calendar.events</code> (to create that event and send its invitations) and
+              <code>calendar.events.owned</code> (to create that event on your own calendar and send its invitations) and
               <code>userinfo.email</code> (to show which account is signed in). Google user data is
               processed only in your browser, is never sent to the developer, and is used solely to
               provide this feature, in adherence with the
@@ -262,6 +262,14 @@
             class="mt-6 px-5 py-2.5 rounded-lg text-sm font-medium text-white btn-primary transition-colors shadow-sm">
             Import a Persons CSV to get started
           </button>
+          <div class="mt-3">
+            <button id="sampleDataBtn" class="text-sm text-primary underline">
+              Or try it with sample data
+            </button>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              12 fictitious people (example.com addresses) — replace them any time by importing your own CSV.
+            </p>
+          </div>
 
           <p class="mt-5 text-xs text-gray-500 dark:text-gray-400">
             <a class="text-primary underline" href="https://congregation-directory.grubernet.org/home.html">About this app</a> ·
@@ -1166,7 +1174,11 @@ const SQL_WASM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/';
 // they just click "Add Google Calendar Event" and sign in through the browser.
 // Leave blank only if you want each self-hoster to enter their own in Settings.
 const GOOGLE_CLIENT_ID = '687021527199-vlqpscmfgrfnobloril5hoe03uoj7dcf.apps.googleusercontent.com';
-const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
+// Least privilege: the app only creates events on the user's own primary calendar, so it
+// asks for calendar.events.owned (calendars you own) rather than calendar.events (all
+// calendars). These must match the scopes configured on the OAuth consent screen.
+const GCAL_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
+const GCAL_SCOPES = `${GCAL_CALENDAR_SCOPE} https://www.googleapis.com/auth/userinfo.email`;
 const GCAL_EVENTS_URL     = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 const GCAL_MAX_REMINDER_MIN = 40320;   // Calendar API cap for reminder overrides (28 days)
@@ -1317,7 +1329,7 @@ let settings = {
   clearSearchOnTagRemove: false,
   countryCode:          '1',
   googleClientId:       '',            // Google OAuth Web client ID (public)
-  googleAuthorized:     false,         // has the user granted the Calendar scope at least once
+  googleAuthorized:     false,         // GCAL_SCOPES the user last granted (false/stale = ask again)
   googleToken:          null,          // { access_token, expires_at, email }
   eventDefaults:        { ...DEFAULT_EVENT_DEFAULTS },
 };
@@ -2590,11 +2602,21 @@ const googleAuth = {
         const resolve = this._resolve, reject = this._reject;
         this._resolve = this._reject = null;
         if (resp && resp.access_token) {
+          // Granular consent lets the user untick Calendar and still finish sign-in
+          if (!google.accounts.oauth2.hasGrantedAllScopes(resp, GCAL_CALENDAR_SCOPE)) {
+            try { google.accounts.oauth2.revoke(resp.access_token, () => {}); } catch (_) {}
+            settings.googleToken = null;
+            settings.googleAuthorized = false;
+            saveSettings();
+            if (reject) reject(new Error('calendar_not_granted'));
+            return;
+          }
           const ttl = (parseInt(resp.expires_in) || 3600) - 60;   // refresh 60s early
-          settings.googleAuthorized = true;
+          settings.googleAuthorized = GCAL_SCOPES;
           settings.googleToken = {
             access_token: resp.access_token,
             expires_at:   Date.now() + ttl * 1000,
+            scope:        GCAL_SCOPES,
             email:        (settings.googleToken && settings.googleToken.email) || null,
           };
           saveSettings();
@@ -2627,13 +2649,14 @@ const googleAuth = {
   // request shows the consent screen; afterwards it refreshes silently.
   async getToken({ interactive = false } = {}) {
     const t = settings.googleToken;
-    if (t && t.access_token && t.expires_at && Date.now() < t.expires_at) return t;
+    // A token granted for different scopes (e.g. before the switch to calendar.events.owned) isn't reused
+    if (t && t.access_token && t.scope === GCAL_SCOPES && t.expires_at && Date.now() < t.expires_at) return t;
     if (!(window.google && google.accounts && google.accounts.oauth2)) {
       throw new Error('gis_not_loaded');
     }
     if (!this._ensureClient()) throw new Error('no_client_id');
     if (this._resolve) throw new Error('auth_in_progress');
-    const prompt = (interactive && !settings.googleAuthorized) ? 'consent' : '';
+    const prompt = (interactive && settings.googleAuthorized !== GCAL_SCOPES) ? 'consent' : '';
     return new Promise((resolve, reject) => {
       this._resolve = resolve; this._reject = reject;
       try {
@@ -2700,6 +2723,7 @@ function openGcalModal() {
     console.error('Google auth failed:', err);
     const msg = err && err.message === 'no_client_id' ? 'Set your Google OAuth Client ID in Settings first'
       : err && err.message === 'gis_not_loaded' ? 'Google sign-in is still loading — try again in a moment'
+      : err && err.message === 'calendar_not_granted' ? 'Calendar permission is needed to create the event — tick it when signing in'
       : 'Google sign-in was cancelled or failed';
     toast(msg);
   });
@@ -3863,6 +3887,30 @@ async function fetchDataVersion(versionUrl, headers) {
   }
 }
 
+// Fictitious directory (demo/sample-persons.csv) for trying the app without real data,
+// e.g. Google's OAuth reviewers exercising "Add Google Calendar Event".
+async function loadSampleData() {
+  try {
+    const res = await fetch('demo/sample-persons.csv', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const count = await importCSVText(await res.text());
+    settings.lastSync = new Date().toISOString();
+    settings.dataVersion = null;   // not the server's data
+    saveSettings();
+    loadAvailTags();
+    loadSelectOptions();
+    applyDefaultFilters();
+    renderActiveFilters();
+    renderResults();
+    renderTagPanel('tagPanelDesktop');
+    renderTagPanel('tagPanelMobile');
+    updateDbStats();
+    toast(`Loaded ${count} sample people`);
+  } catch (e) {
+    toast(`Couldn't load sample data: ${e.message}`);
+  }
+}
+
 function setupAutoSync() {
   if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
   if (settings.autoSyncInterval > 0 && settings.csvUrl) {
@@ -4129,6 +4177,7 @@ async function init() {
   // Settings
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
   document.getElementById('emptyImportBtn').addEventListener('click', openSettings);
+  document.getElementById('sampleDataBtn').addEventListener('click', loadSampleData);
   document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
   document.getElementById('settingsModalBackdrop').addEventListener('click', closeSettings);
 

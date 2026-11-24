@@ -9,4 +9,7 @@ desktop.ini
 *.swp
 *~
 
+# Real directory exports must never be committed
 *.csv
+# ...except the fictitious sample data (see demo/)
+!demo/sample-persons.csv
