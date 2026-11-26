@@ -1342,6 +1342,7 @@ function loadSettings() {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     Object.assign(settings, s);
     if (!settings.countryCode) settings.countryCode = '1';
+    delete settings.lastGcalEvent;   // no longer stored (data minimisation); dropped on next save
     // Deep-merge event defaults so new fields survive older stored settings
     settings.eventDefaults = Object.assign({ ...DEFAULT_EVENT_DEFAULTS }, settings.eventDefaults || {});
   } catch(_) {}
@@ -2851,8 +2852,6 @@ async function createCalendarEventForDisplayed() {
     closeGcalModal();
     const skipped = currentPersons.length - withEmail.length;
     toast(`✅ Event created — invited ${withEmail.length}${skipped ? `, skipped ${skipped}` : ''}`);
-    settings.lastGcalEvent = { id: event.id, htmlLink: event.htmlLink || '' };
-    saveSettings();
     if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener');
   } catch (err) {
     console.error('Calendar event creation failed:', err);

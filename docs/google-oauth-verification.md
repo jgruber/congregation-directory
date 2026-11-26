@@ -43,6 +43,15 @@ Upload to YouTube as **Unlisted** (not Private: reviewers must be able to open t
 without signing in). Check the link in a private browser window before submitting. Record in
 English, at a readable resolution, with the browser address bar visible throughout.
 
+**Make sure the consent screen appears.** Google skips it for an account that has
+already granted access, so a video recorded after an earlier test shows no consent screen (this
+is why the 2026-11-26 review was returned). Before recording:
+
+1. Remove the app's access at https://myaccount.google.com/connections (find "Congregation
+   Directory" and delete all connections).
+2. Record in a new **Incognito** (or Guest) window, so the app has no saved sign-in and asks
+   Google for consent.
+
 Shot list:
 
 1. Open https://congregation-directory.grubernet.org/ and show the address bar. Scroll the
@@ -52,7 +61,7 @@ Shot list:
 3. Optionally filter (for example, choose field service group "Group North") to show that
    the event invites the people currently displayed.
 4. Open **Actions** (⋮ in the top bar) → **Add Google Calendar Event…**.
-5. **Consent screen:** the Google sign-in opens. Show the app name and the developer details,
+5. **Consent screen (required):** the Google sign-in opens. Pick the account. Show the app name and the developer details,
    and if the permissions are collapsed click **"Show all services"** / expand them so
    "See, create, change, and delete events on Google calendars you own" is fully readable.
    Tick it and continue.
@@ -79,7 +88,13 @@ Shot list:
 >
 > Invitations to the sample example.com addresses cannot be delivered; that is expected.
 
-## 5. Resubmit
+## 5. Privacy policy: data protection
+
+Google requires the privacy policy of an app with sensitive scopes to describe its data
+protection mechanisms. That is the "How your data is protected" section of
+https://congregation-directory.grubernet.org/privacy.html (added 2026-11-26).
+
+## 6. Resubmit
 
 1. In the Cloud Console, Google Auth Platform → **Verification Center**, start the
    verification again with the new video link and the justification above. Keep the

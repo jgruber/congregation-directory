@@ -44,7 +44,7 @@
       <img src="favicon-512x512.png" alt="Congregation Directory logo">
       <div>
         <h1>Congregation Directory — Privacy Policy</h1>
-        <p>Last updated: 27 July 2026</p>
+        <p>Last updated: 26 November 2026</p>
       </div>
     </header>
 
@@ -96,6 +96,61 @@
         at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">your
         Google Account permissions page</a>.
       </p>
+    </div>
+
+    <h2>How your data is protected</h2>
+    <div class="card">
+      <p>The app protects Google user data and directory data with these mechanisms:</p>
+      <ul>
+        <li>
+          <strong>No server, no developer access.</strong> There is no back end that receives Google
+          data. Your access token, your account email and the events you create go only between your
+          browser and Google, so there is no central copy that could be breached, and the developer
+          never has access to it.
+        </li>
+        <li>
+          <strong>Encryption in transit.</strong> The app is served only over HTTPS (enforced by
+          GitHub Pages), and every Google API call is made over HTTPS (TLS) directly from your
+          browser to Google.
+        </li>
+        <li>
+          <strong>Least privilege.</strong> The app requests only <code>calendar.events.owned</code>,
+          limited to calendars you own, and <code>userinfo.email</code>. It only creates the event you
+          configure; it never reads, lists, changes, or deletes your calendar events.
+        </li>
+        <li>
+          <strong>Data minimisation.</strong> The only Google data kept on your device is the access
+          token, its expiry time and your account email address, held in your browser's local
+          storage. No calendar content is read or stored.
+        </li>
+        <li>
+          <strong>Short-lived, revocable tokens.</strong> Access tokens come from Google Identity
+          Services and expire after about one hour. <em>Sign out</em> deletes the token and revokes it
+          with Google. If you decline the Calendar permission at sign-in, the token is revoked and
+          discarded immediately.
+        </li>
+        <li>
+          <strong>Restricted OAuth client.</strong> The app's Google OAuth client accepts sign-ins only
+          from this site's own address (its authorized JavaScript origin), so other websites cannot
+          obtain tokens through it.
+        </li>
+        <li>
+          <strong>Browser isolation.</strong> Data stored by the app (directory database, settings and
+          token) is kept in your browser's storage for this site only. The browser's same-origin
+          policy prevents other websites from reading it. It is protected at rest by your device and
+          browser account security, so we recommend using a screen lock on any device where you use
+          the app.
+        </li>
+        <li>
+          <strong>No tracking or third-party sharing.</strong> The app contains no analytics,
+          advertising or tracking code, and Google user data is never sent to anyone other than
+          Google.
+        </li>
+        <li>
+          <strong>Transparency.</strong> The complete source code is public, so these practices can be
+          checked. Security issues can be reported to the contact address below.
+        </li>
+      </ul>
     </div>
 
     <h2>Limited Use disclosure</h2>
